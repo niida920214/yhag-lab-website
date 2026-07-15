@@ -1,0 +1,10 @@
+# Design/planning files kept locally only (not part of the site source)
+*.pptx
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor/tooling
+.vscode/
+node_modules/

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yahagi Zoo</title>
+  <meta name="description" content="Yahagi Zoo — 火炎輝度解析ツール（Flame Luminance Analyzer）ほか、研究室の各種ツールへのアクセスページ。" />
+  <meta name="theme-color" content="#0f2a5c" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%230f2a5c'/%3E%3Ctext x='32' y='42' font-size='30' text-anchor='middle' fill='%23fff' font-family='serif'%3E矢%3C/text%3E%3C/svg%3E" />
+
+  <!-- 初回訪問時はダークモードがデフォルト。保存済みの手動選択があればそれを優先し、
+       CSS適用前にdata-theme属性を確定させることでライト→ダークのちらつきを防ぐ。 -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("yahagi-lab-theme");
+        document.documentElement.setAttribute(
+          "data-theme",
+          stored === "light" || stored === "dark" ? stored : "dark"
+        );
+      } catch (err) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" defer></script>
+  <script src="assets/js/script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">メインコンテンツへ移動</a>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="brand">
+        <!-- ============================================================
+             LOGO PLACEHOLDER — 【ロゴ画像の差し替え方法】
+             src/assets/images/logo.png という名前で画像ファイルを保存する
+             だけで、このロゴが自動的に切り替わります（このHTML自体は
+             書き換え不要）。
+             ・推奨サイズ: 正方形 80×80px 前後（PNG / SVG、背景透過推奨）
+             ・ファイルがまだ無い間は、白い角丸スクエアのプレースホルダー
+               （logo-placeholder.svg）が自動的に表示されます。
+             ・別のファイル名にしたい場合は、下の src="assets/images/logo.png"
+               の部分だけを書き換えてください。
+        ============================================================ -->
+        <img
+          src="assets/images/logo.png"
+          alt="Yahagi Lab. ロゴ"
+          class="brand-logo"
+          width="40"
+          height="40"
+          onerror="this.onerror=null; this.src='assets/images/logo-placeholder.svg';"
+        />
+        <span>
+          Yahagi Lab.
+        </span>
+      </a>
+
+      <nav class="main-nav" id="main-nav" aria-label="グローバルナビゲーション">
+        <a href="index.html" aria-current="page">トップ</a>
+        <a href="tools/flame-analyzer.html">解析ツール（Tools）</a>
+      </nav>
+
+      <div class="header-actions">
+        <!-- ============================================================
+             【構築中ボタン】退室メール（オレンジ = Upcoming の目印）
+             機能が完成したら、下の <button ... disabled> を
+             <a class="btn btn-upcoming" href="実際のURLやページ"> に変更し、
+             disabled 属性と <span class="upcoming-badge">Upcoming</span> を
+             削除すれば、通常の使えるボタンになります。
+        ============================================================ -->
+        <button
+          type="button"
+          class="btn btn-upcoming"
+          disabled
+          aria-disabled="true"
+          title="現在準備中の機能です（Upcoming）"
+        >
+          <i data-lucide="mail"></i>
+          退室メール
+          <span class="upcoming-badge">Upcoming</span>
+        </button>
+
+        <button class="icon-btn theme-toggle" type="button" aria-pressed="true" aria-label="ダークモードの切り替え">
+          <i data-lucide="sun" class="icon-sun"></i>
+          <i data-lucide="moon" class="icon-moon"></i>
+        </button>
+        <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="メニューを開閉する">
+          <i data-lucide="menu"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- ================= 中央ヒーロー：巨大タイトルのみ ================= -->
+    <section class="hero-zoo">
+      <div class="container">
+        <h1>Yahagi Zoo</h1>
+      </div>
+    </section>
+
+    <!-- ================= ツールカテゴリ 3カラム =================
+         PCでは横並び3列、スマホでは縦1列に自動で切り替わります。
+
+         【編集ガイド】各カラム内のボタンについて
+         ・文字を変える　　　→ ボタンのテキスト部分をそのまま書き換えるだけでOK
+         ・リンク先を変える　→ <a> タグの href="..." を書き換えるだけでOK
+         ・ボタンを増やす　　→ 1個分のブロック（<a class="tool-btn">...</a> または
+                               <button class="tool-btn">...</button>）をコピー＆
+                               ペーストして、中身を書き換えるだけでOK
+         ・「Upcoming（構築中）」にしたい場合 → class に " is-upcoming" を追加し、
+           タグを <button type="button" class="tool-btn is-upcoming" disabled> に
+           変更してください（<a> ではなく <button disabled> にすること）
+    ============================================================= -->
+    <section class="tool-sections" aria-labelledby="tool-sections-heading">
+      <div class="container">
+        <h2 id="tool-sections-heading" class="visually-hidden">ツールカテゴリ一覧</h2>
+
+        <div class="tool-columns">
+          <!-- ============ 左カラム：お遊び（Upcoming） ============ -->
+          <div class="tool-column">
+            <h3>お遊び</h3>
+            <div class="tool-btn-list">
+              <!-- Button 1 Start（お遊び・Upcoming） -->
+              <button
+                type="button"
+                class="tool-btn is-upcoming"
+                disabled
+                aria-label="お遊びコンテンツ1（Upcoming）"
+                title="Upcoming"
+              >
+                <i data-lucide="hourglass"></i>
+                Upcoming
+              </button>
+              <!-- Button 1 End -->
+
+              <!-- Button 2 Start（お遊び・Upcoming） -->
+              <button
+                type="button"
+                class="tool-btn is-upcoming"
+                disabled
+                aria-label="お遊びコンテンツ2（Upcoming）"
+                title="Upcoming"
+              >
+                <i data-lucide="hourglass"></i>
+                Upcoming
+              </button>
+              <!-- Button 2 End -->
+            </div>
+          </div>
+
+          <!-- ============ 中央カラム：教育ツール ============ -->
+          <div class="tool-column tool-column--dark">
+            <h3>教育ツール</h3>
+            <div class="tool-btn-list">
+              <!-- Button 1 Start：Camera Setting（リンク先未定。ページ完成後、
+                   下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
+              <button type="button" class="tool-btn">
+                <i data-lucide="camera"></i>
+                Camera Setting
+              </button>
+              <!-- Button 1 End -->
+
+              <!-- Button 2 Start：ナビエストークス（リンク先未定。ページ完成後、
+                   下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
+              <button type="button" class="tool-btn">
+                <i data-lucide="waves"></i>
+                ナビエストークス
+              </button>
+              <!-- Button 2 End -->
+            </div>
+          </div>
+
+          <!-- ============ 右カラム：実験ツール ============ -->
+          <div class="tool-column tool-column--dark">
+            <h3>実験ツール</h3>
+            <div class="tool-btn-list">
+              <!-- Button 1 Start：Flame Luminance Analyzer（既存ページへリンク済み） -->
+              <a class="tool-btn" href="tools/flame-analyzer.html">
+                <i data-lucide="flame"></i>
+                Flame Luminance Analyzer
+              </a>
+              <!-- Button 1 End -->
+
+              <!-- Button 2 Start：Frequency Analyzer（リンク先未定。ページ完成後、
+                   下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
+              <button type="button" class="tool-btn">
+                <i data-lucide="radio"></i>
+                Frequency Analyzer
+              </button>
+              <!-- Button 2 End -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= フッター注記 =================
+       文字を変えたい場合は、下の <p> の中身をそのまま書き換えてください。
+  ============================================================= -->
+  <footer class="page-footnote">
+    <div class="container">
+      <p>案があればしょういちまで</p>
+    </div>
+  </footer>
+</body>
+</html>
