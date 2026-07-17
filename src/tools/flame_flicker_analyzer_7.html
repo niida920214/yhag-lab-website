@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flame Flicker Frequency Analyzer — 火炎振動周波数解析ツール</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root[data-theme="dark"]{
+  --bg:#0d1117; --bg-2:#12181f; --panel:#161d26; --panel-2:#1b2430;
+  --border:#2a3543; --border-soft:#222b37;
+  --text:#e7edf3; --text-2:#9fb0c0; --text-3:#6b7c8d;
+  --accent:#ff9b3d; --accent-2:#ffb066; --accent-dim:rgba(255,155,61,.14);
+  --green:#34d17b; --green-dim:rgba(52,209,123,.15);
+  --blue:#4da3ff; --red:#ff6b6b; --yellow:#ffd166;
+  --chart-grid:rgba(160,180,200,.10); --chart-tick:#7a8b9c;
+  --shadow:0 8px 28px rgba(0,0,0,.45);
+  --code-bg:#0b0f14;
+}
+:root[data-theme="light"]{
+  --bg:#f2f4f7; --bg-2:#eaeef3; --panel:#ffffff; --panel-2:#f6f8fa;
+  --border:#d4dbe3; --border-soft:#e2e8ef;
+  --text:#1a2430; --text-2:#4b5a6a; --text-3:#7d8b99;
+  --accent:#e07b1a; --accent-2:#c96a0e; --accent-dim:rgba(224,123,26,.12);
+  --green:#159a54; --green-dim:rgba(21,154,84,.12);
+  --blue:#1a6fd4; --red:#d43f3f; --yellow:#b98900;
+  --chart-grid:rgba(40,60,80,.10); --chart-tick:#5a6b7b;
+  --shadow:0 8px 24px rgba(30,45,60,.12);
+  --code-bg:#eef1f5;
+}
+*{box-sizing:border-box; margin:0; padding:0}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;
+  background:var(--bg); color:var(--text); font-size:14px; line-height:1.55;
+  transition:background .25s,color .25s;
+}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","Consolas",monospace}
+.serif{font-family:"Times New Roman","STIX Two Text",Georgia,serif}
+
+/* ---------- Header ---------- */
+header{
+  display:flex; align-items:center; gap:14px; padding:12px 20px;
+  background:linear-gradient(180deg,var(--panel),var(--bg-2));
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50;
+}
+.logo{
+  width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+  background:radial-gradient(circle at 50% 68%, var(--accent) 0%, #d94f1e 55%, transparent 72%),
+             radial-gradient(circle at 50% 40%, var(--yellow) 0%, transparent 45%), var(--panel-2);
+  border:1px solid var(--border); box-shadow:inset 0 0 12px rgba(255,140,40,.35);
+}
+header h1{font-size:16px; font-weight:650; letter-spacing:.02em}
+header .sub{font-size:11.5px; color:var(--text-3); margin-top:1px}
+header .spacer{flex:1}
+.btn{
+  display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border);
+  background:var(--panel-2); color:var(--text); padding:7px 13px; border-radius:9px;
+  font-size:13px; cursor:pointer; transition:all .18s; user-select:none; font-family:inherit;
+}
+.btn:hover{border-color:var(--accent); color:var(--accent-2); transform:translateY(-1px)}
+.btn:disabled{opacity:.45; cursor:not-allowed; transform:none}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#1a0e02; font-weight:650}
+.btn.primary:hover{background:var(--accent-2); color:#1a0e02}
+.btn.small{padding:4px 9px; font-size:12px; border-radius:7px}
+
+/* ---------- Layout ---------- */
+.layout{
+  display:grid; grid-template-columns:308px minmax(420px,1fr) 430px;
+  gap:16px; padding:16px 20px 40px; align-items:start; max-width:1920px; margin:0 auto;
+}
+@media(max-width:1360px){ .layout{grid-template-columns:300px 1fr} .col-right{grid-column:1/-1} }
+@media(max-width:900px){ .layout{grid-template-columns:1fr} }
+.col{display:flex; flex-direction:column; gap:16px; min-width:0}
+
+.card{
+  background:var(--panel); border:1px solid var(--border); border-radius:14px;
+  box-shadow:var(--shadow); overflow:hidden; transition:background .25s,border-color .25s;
+}
+.card-h{
+  display:flex; align-items:center; gap:8px; padding:11px 15px;
+  border-bottom:1px solid var(--border-soft); font-weight:650; font-size:13px; letter-spacing:.03em;
+}
+.card-h .tag{margin-left:auto; font-size:10.5px; color:var(--text-3); font-weight:500}
+.card-b{padding:14px 15px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.dot.g{background:var(--green)} .dot.b{background:var(--blue)}
+
+/* ---------- Dropzone ---------- */
+.dropzone{
+  border:2px dashed var(--border); border-radius:12px; padding:22px 12px; text-align:center;
+  color:var(--text-2); cursor:pointer; transition:all .2s; background:var(--panel-2);
+}
+.dropzone:hover,.dropzone.over{border-color:var(--accent); background:var(--accent-dim); color:var(--accent-2)}
+.dropzone .big{font-size:26px; margin-bottom:6px}
+.dropzone p{font-size:12.5px}
+.dropzone .hint{font-size:11px; color:var(--text-3); margin-top:4px}
+
+/* ---------- Queue ---------- */
+.queue{display:flex; flex-direction:column; gap:9px; max-height:340px; overflow-y:auto; padding-right:2px}
+.qcard{
+  border:1px solid var(--border); border-radius:11px; padding:10px 11px; cursor:pointer;
+  background:var(--panel-2); transition:all .18s; position:relative;
+}
+.qcard:hover{border-color:var(--text-3)}
+.qcard.active{border-color:var(--accent); background:var(--accent-dim)}
+.qcard .name{font-size:12.5px; font-weight:600; word-break:break-all; padding-right:20px}
+.qcard .meta{display:flex; gap:10px; margin-top:5px; font-size:11px; color:var(--text-2)}
+.qcard .del{
+  position:absolute; top:8px; right:9px; border:none; background:none; color:var(--text-3);
+  cursor:pointer; font-size:14px; line-height:1; padding:2px;
+}
+.qcard .del:hover{color:var(--red)}
+.status{
+  display:inline-block; margin-top:7px; font-size:10.5px; padding:2px 9px; border-radius:20px;
+  border:1px solid var(--border); color:var(--text-2);
+}
+.status.running{color:var(--yellow); border-color:var(--yellow); animation:pulse 1.1s infinite}
+.status.done{color:var(--green); border-color:var(--green); background:var(--green-dim)}
+@keyframes pulse{50%{opacity:.45}}
+.empty-q{font-size:12px; color:var(--text-3); text-align:center; padding:10px 0}
+
+/* ---------- Settings ---------- */
+.field{margin-bottom:12px}
+.field label{display:block; font-size:11.5px; color:var(--text-2); margin-bottom:5px; letter-spacing:.02em}
+.field input[type=number], .field input[type=text]{
+  width:100%; background:var(--bg-2); border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:7px 10px; font-size:13px; font-family:ui-monospace,monospace;
+  transition:border-color .15s; outline:none;
+}
+.field input:focus{border-color:var(--accent)}
+.field input:disabled{opacity:.5}
+.check{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2); cursor:pointer; margin-bottom:12px}
+.check input{accent-color:var(--accent); width:15px; height:15px; cursor:pointer}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.row4{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+
+/* ---------- Video stage ---------- */
+.stage-wrap{padding:14px 15px}
+.stage{
+  position:relative; background:#000; border-radius:10px; overflow:hidden;
+  border:1px solid var(--border); min-height:240px; display:flex; align-items:center; justify-content:center;
+  user-select:none;
+}
+.stage video{display:block; width:100%; height:auto; max-height:56vh}
+.stage .placeholder{color:var(--text-3); font-size:13px; padding:70px 20px; text-align:center}
+.roi{
+  position:absolute; border:2px solid var(--green); box-shadow:0 0 0 1px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.35);
+  cursor:move; touch-action:none;
+}
+.roi .lbl{
+  position:absolute; top:-22px; left:-2px; background:var(--green); color:#04240f;
+  font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:5px 5px 5px 0; white-space:nowrap;
+  font-family:ui-monospace,monospace;
+}
+.hnd{position:absolute; width:11px; height:11px; background:var(--green); border:1.5px solid #04240f; border-radius:3px}
+.hnd.nw{top:-6px;left:-6px;cursor:nwse-resize} .hnd.n{top:-6px;left:calc(50% - 5px);cursor:ns-resize}
+.hnd.ne{top:-6px;right:-6px;cursor:nesw-resize} .hnd.e{top:calc(50% - 5px);right:-6px;cursor:ew-resize}
+.hnd.se{bottom:-6px;right:-6px;cursor:nwse-resize} .hnd.s{bottom:-6px;left:calc(50% - 5px);cursor:ns-resize}
+.hnd.sw{bottom:-6px;left:-6px;cursor:nesw-resize} .hnd.w{top:calc(50% - 5px);left:-6px;cursor:ew-resize}
+
+.vctrl{display:flex; align-items:center; gap:10px; margin-top:12px}
+.vctrl input[type=range]{flex:1; accent-color:var(--accent)}
+.tcode{font-size:11.5px; color:var(--text-2); min-width:96px; text-align:right}
+
+.roi-grid{margin-top:14px}
+.roi-grid .unit-note{font-size:11px; color:var(--text-3); margin-top:6px}
+.progress{
+  height:9px; border-radius:6px; background:var(--bg-2); border:1px solid var(--border);
+  overflow:hidden; margin-top:12px; display:none;
+}
+.progress .bar{height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--yellow)); transition:width .15s}
+.progress-txt{font-size:11.5px; color:var(--text-2); margin-top:5px; display:none}
+
+/* ---------- Results ---------- */
+.peak-hero{
+  text-align:center; padding:16px 10px 14px; border-radius:12px; margin-bottom:14px;
+  background:linear-gradient(180deg,var(--accent-dim),transparent); border:1px solid var(--border);
+}
+.peak-hero .v{font-size:38px; font-weight:750; letter-spacing:.01em; color:var(--accent);
+  font-family:ui-monospace,"Cascadia Code",monospace; line-height:1.1}
+.peak-hero .v small{font-size:17px; color:var(--accent-2)}
+.peak-hero .l{font-size:11px; color:var(--text-2); letter-spacing:.14em; margin-top:4px}
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+.stat{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:10px; padding:9px 11px}
+.stat .k{font-size:10.5px; color:var(--text-3); letter-spacing:.04em}
+.stat .v{font-size:15.5px; font-weight:650; margin-top:2px; font-family:ui-monospace,monospace}
+.stat .v .u{font-size:11px; color:var(--text-2); font-weight:400}
+.judge{grid-column:1/-1; display:flex; align-items:center; gap:10px}
+.judge .badge{font-size:12.5px; font-weight:700; padding:3px 12px; border-radius:20px}
+.judge.ok .badge{background:var(--green-dim); color:var(--green); border:1px solid var(--green)}
+.judge.mid .badge{background:rgba(255,209,102,.13); color:var(--yellow); border:1px solid var(--yellow)}
+.judge.bad .badge{background:rgba(255,107,107,.13); color:var(--red); border:1px solid var(--red)}
+.warn{
+  margin-top:10px; font-size:11.5px; border-radius:9px; padding:8px 11px; line-height:1.5;
+  background:rgba(255,209,102,.08); border:1px solid rgba(255,209,102,.4); color:var(--yellow); display:none;
+}
+.note-line{font-size:11px; color:var(--text-3); margin-top:9px; line-height:1.5}
+
+.chart-box{position:relative; height:215px; margin-top:6px}
+.chart-tools{display:flex; gap:6px; align-items:center; margin-left:auto}
+.seg{display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden}
+.seg button{
+  border:none; background:var(--panel-2); color:var(--text-2); font-size:11px; padding:4px 9px;
+  cursor:pointer; font-family:inherit; transition:all .15s;
+}
+.seg button.on{background:var(--accent); color:#1a0e02; font-weight:650}
+
+/* ---------- Academic ---------- */
+.acad{font-size:13px; color:var(--text-2); line-height:1.75}
+.acad h4{color:var(--text); font-size:13.5px; margin:14px 0 6px}
+.acad h4:first-child{margin-top:0}
+.acad strong{color:var(--accent-2)}
+.eq{
+  font-family:"Times New Roman","STIX Two Math",Georgia,serif; font-size:16.5px; color:var(--text);
+  background:var(--code-bg); border:1px solid var(--border-soft); border-radius:10px;
+  padding:13px 14px; margin:10px 0; text-align:center; overflow-x:auto; white-space:nowrap;
+}
+.eq i{font-style:italic}
+.eq sub,.eq sup{font-size:.68em}
+.frac{display:inline-block; vertical-align:middle; text-align:center; margin:0 3px}
+.frac .num{display:block; padding:0 5px; border-bottom:1.2px solid var(--text); line-height:1.25}
+.frac .den{display:block; padding:0 5px; line-height:1.25}
+.acad ul{padding-left:18px; margin:6px 0}
+.acad li{margin-bottom:5px}
+
+.status.error{color:var(--red); border-color:var(--red); background:rgba(255,107,107,.13)}
+.qcard.error{border-color:var(--red)}
+.qcard.error:hover{border-color:var(--red)}
+
+.stage-error{
+  padding:26px 22px; text-align:left; color:var(--text-2); max-width:520px; margin:0 auto;
+}
+.stage-error .head{
+  display:flex; align-items:center; gap:9px; color:var(--red); font-weight:700; font-size:14.5px; margin-bottom:10px;
+}
+.stage-error .head .x{
+  width:22px; height:22px; border-radius:50%; background:rgba(255,107,107,.15); border:1px solid var(--red);
+  display:flex; align-items:center; justify-content:center; font-size:13px; flex:0 0 auto;
+}
+.stage-error p{font-size:12.5px; line-height:1.7; margin-bottom:8px}
+.stage-error .fix{
+  background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px 13px; margin-top:8px;
+}
+.stage-error .fix .k{font-size:11px; color:var(--accent-2); font-weight:700; letter-spacing:.03em; margin-bottom:4px}
+.stage-error code{
+  background:var(--code-bg); border:1px solid var(--border-soft); border-radius:5px; padding:1px 6px;
+  font-family:ui-monospace,monospace; font-size:11.5px; color:var(--accent-2);
+}
+.stage-error .fname{font-size:11.5px; color:var(--text-3); margin-top:12px; word-break:break-all}
+
+footer{ text-align:center; font-size:11px; color:var(--text-3); padding:6px 0 26px }
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="logo"></div>
+  <div>
+    <h1>Flame Flicker Frequency Analyzer</h1>
+    <div class="sub">火炎振動周波数解析ツール — ROI輝度RMS / 自己相関 / FFTスペクトル</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="exportCsvBtn" disabled>⬇ CSV エクスポート</button>
+  <button class="btn" id="themeBtn">◐ テーマ</button>
+</header>
+
+<div class="layout">
+
+  <!-- ================= LEFT ================= -->
+  <div class="col col-left">
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>動画インポート</div>
+      <div class="card-b">
+        <div class="dropzone" id="dropzone">
+          <div class="big">🎞</div>
+          <p>動画をここにドラッグ＆ドロップ<br>またはクリックして選択</p>
+          <div class="hint">.mp4 / .mov / .webm 推奨（.aviは事前に変換してください）</div>
+        </div>
+        <input type="file" id="fileInput" accept="video/*,.avi,.mov,.mp4,.webm" multiple hidden>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot b"></span>解析待機キュー <span class="tag" id="qCount">0 件</span></div>
+      <div class="card-b">
+        <div class="queue" id="queue"><div class="empty-q">動画が未登録です</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot g"></span>解析設定</div>
+      <div class="card-b">
+        <label class="check"><input type="checkbox" id="allFrames"> 全フレームを解析する</label>
+        <div class="field">
+          <label>解析フレーム数 (Limit)</label>
+          <input type="number" id="frameLimit" value="1000" min="16" step="1">
+        </div>
+        <label class="check"><input type="checkbox" id="autoDt"> dt を 1 / FPS から自動計算</label>
+        <div class="field">
+          <label>時間ステップ dt [s]（高速度カメラの実撮影値を入力）</label>
+          <input type="number" id="dtInput" value="0.004" step="0.0001" min="0.00001">
+        </div>
+        <div class="field">
+          <label>空間スケール [mm / pixel]（ROI寸法のmm換算に使用）</label>
+          <input type="number" id="mmPerPx" value="0.1" step="0.001" min="0.0001">
+        </div>
+        <button class="btn primary" id="startBtn" style="width:100%; justify-content:center; margin-top:4px" disabled>▶ 解析開始</button>
+        <div class="note-line">ブラウザ内で1フレームずつシーク→デコード反映待ち（30ms/フレームの確実な猶予）→緑枠ROI内の輝度RMS算出、を繰り返します。コマ重複を防ぐ確実性を優先しているため、1000フレームで1〜2分程度かかります。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CENTER ================= -->
+  <div class="col col-center">
+    <div class="card">
+      <div class="card-h"><span class="dot g"></span>動画プレビュー & ROI（緑枠）調整
+        <span class="tag" id="vidMeta">—</span>
+      </div>
+      <div class="stage-wrap">
+        <div class="stage" id="stage">
+          <div class="placeholder" id="stagePh">左のキューから動画を選択すると、ここにプレビューとROI枠が表示されます</div>
+          <video id="video" muted playsinline style="display:none"></video>
+          <div class="roi" id="roiBox" style="display:none">
+            <div class="lbl" id="roiLbl">ROI</div>
+            <div class="hnd nw" data-h="nw"></div><div class="hnd n" data-h="n"></div>
+            <div class="hnd ne" data-h="ne"></div><div class="hnd e" data-h="e"></div>
+            <div class="hnd se" data-h="se"></div><div class="hnd s" data-h="s"></div>
+            <div class="hnd sw" data-h="sw"></div><div class="hnd w" data-h="w"></div>
+          </div>
+        </div>
+
+        <div class="vctrl">
+          <button class="btn small" id="playBtn" disabled>▶</button>
+          <input type="range" id="seekBar" min="0" max="1000" value="0" disabled>
+          <div class="tcode mono" id="tcode">00:00.000 / 00:00.000</div>
+        </div>
+
+        <div class="roi-grid">
+          <div class="row4">
+            <div class="field"><label>X [px]</label><input type="number" id="roiX" value="0" step="1"></div>
+            <div class="field"><label>Y [px]</label><input type="number" id="roiY" value="0" step="1"></div>
+            <div class="field"><label>Width [px]</label><input type="number" id="roiW" value="100" step="1"></div>
+            <div class="field"><label>Height [px]</label><input type="number" id="roiH" value="100" step="1"></div>
+          </div>
+          <div class="row4">
+            <div class="field"><label>X [mm]</label><input type="number" id="roiXmm" step="0.01"></div>
+            <div class="field"><label>Y [mm]</label><input type="number" id="roiYmm" step="0.01"></div>
+            <div class="field"><label>Width [mm]</label><input type="number" id="roiWmm" step="0.01"></div>
+            <div class="field"><label>Height [mm]</label><input type="number" id="roiHmm" step="0.01"></div>
+          </div>
+          <div class="unit-note">緑枠はドラッグで移動、端・角のハンドルでリサイズできます。数値入力（px / mm）とも双方向に連動します。</div>
+        </div>
+
+        <div class="progress" id="prog"><div class="bar" id="progBar"></div></div>
+        <div class="progress-txt mono" id="progTxt"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>学術的背景 — なぜ自己相関経由のFFTを用いるのか</div>
+      <div class="card-b acad">
+        <h4>1. 解析パイプライン</h4>
+        <p>各フレームのROI内グレースケール輝度 <span class="serif"><i>I</i>(x, y)</span> から実効値（RMS）を求め、時系列 <span class="serif"><i>x</i>(t)</span> を構成します。</p>
+        <div class="eq">
+          <i>x</i><sub>RMS</sub> = √<span style="border-top:1.2px solid var(--text); padding:0 4px">
+          <span class="frac"><span class="num">1</span><span class="den"><i>W</i> · <i>H</i></span></span>
+          Σ<sub>x,y</sub> <i>I</i><sup> 2</sup>(x, y)</span>
+        </div>
+        <p>平均値を差し引いた輝度変動成分 <span class="serif"><i>x&#39;</i>(t) = <i>x</i>(t) − ⟨<i>x</i>⟩</span> に対して解析を行います。</p>
+
+        <h4>2. 自己相関関数とウィーナー・ヒンチンの定理</h4>
+        <p>自己相関関数 <span class="serif"><i>R</i>(τ)</span> はFFTを介して効率的に計算されます（Wiener–Khinchin の定理）。</p>
+        <div class="eq">
+          <i>R</i>(τ) = ℜ&thinsp;[ IFFT( |FFT(<i>x&#39;</i>)|<sup>2</sup> ) ],&nbsp;&nbsp;
+          <i>R̂</i>(τ) = <span class="frac"><span class="num"><i>R</i>(τ)</span><span class="den"><i>R</i>(0)</span></span>
+        </div>
+
+        <h4>3. 直接FFTに対する優位性</h4>
+        <ul>
+          <li>直接FFTでは、火炎の<strong>不規則な揺らぎやランダムノイズ</strong>がスペクトル全体に分散して乗るため、支配的ピークが埋もれやすくなります。</li>
+          <li>ランダム成分は位相が揃わないため、自己相関関数上ではラグ τ の増加とともに<strong>速やかに減衰</strong>します。一方、規則的（コヒーレント）な周期振動成分は τ が大きくなっても相関を保ちます。</li>
+          <li>したがって正規化自己相関 <span class="serif"><i>R̂</i>(τ)</span> に対して再度FFTを施すと（パワースペクトルのスペクトルに相当する操作）、<strong>火炎の支配的な自励振動周波数が極めてシャープかつ高S/N比で抽出</strong>されます。</li>
+        </ul>
+        <div class="eq">
+          <i>f</i><sub>peak</sub> = arg&thinsp;max<sub><i>f</i> &gt; 0</sub> | FFT( <i>R̂</i>(τ) ) |<sup>2</sup>
+        </div>
+
+        <h4>4. サンプリングと折り返し（エイリアシング）</h4>
+        <p>検出可能な周波数上限はナイキスト周波数 <span class="serif"><i>f</i><sub>N</sub> = 1 / (2·d<i>t</i>)</span> です。真の振動周波数が <span class="serif"><i>f</i><sub>N</sub></span> を超える場合、スペクトル上では低周波側に折り返された偽ピークとして現れるため、高速度カメラのフレームレート（dt）の妥当性を必ず確認してください。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= RIGHT ================= -->
+  <div class="col col-right">
+    <div class="card">
+      <div class="card-h"><span class="dot"></span>解析結果 <span class="tag" id="resVideoName">—</span></div>
+      <div class="card-b">
+        <div class="peak-hero">
+          <div class="v" id="peakVal">—<small> Hz</small></div>
+          <div class="l">PEAK FREQUENCY（自己相関経由FFT）</div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">平均輝度 ⟨x⟩</div><div class="v" id="stMean">—</div></div>
+          <div class="stat"><div class="k">輝度標準偏差 σ</div><div class="v" id="stStd">—</div></div>
+          <div class="stat"><div class="k">変動強度 σ/⟨x⟩</div><div class="v" id="stCv">—</div></div>
+          <div class="stat"><div class="k">ナイキスト周波数 f<sub>N</sub></div><div class="v" id="stNyq">—</div></div>
+          <div class="stat"><div class="k">解析フレーム数 / dt</div><div class="v" id="stFrames">—</div></div>
+          <div class="stat"><div class="k">周波数分解能 Δf</div><div class="v" id="stDf">—</div></div>
+          <div class="stat judge" id="judgeRow" style="display:none">
+            <span style="font-size:11px;color:var(--text-3)">火炎安定性の簡易判定</span>
+            <span class="badge" id="judgeBadge">—</span>
+          </div>
+        </div>
+        <div class="warn" id="aliasWarn"></div>
+        <div class="note-line">安定性判定は変動強度 σ/⟨x⟩ に基づく簡易指標です（&lt;2%: 安定 / 2–8%: 微小振動 / &gt;8%: 激しい自励振動）。定量評価には燃焼器固有の基準と併用してください。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot b"></span>時系列輝度変動
+        <div class="chart-tools"><button class="btn small" data-png="tsChart">PNG</button></div>
+      </div>
+      <div class="card-b"><div class="chart-box"><canvas id="tsChart"></canvas></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot b"></span>自己相関関数 R̂(τ)
+        <div class="chart-tools"><button class="btn small" data-png="acChart">PNG</button></div>
+      </div>
+      <div class="card-b"><div class="chart-box"><canvas id="acChart"></canvas></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><span class="dot b"></span>周波数スペクトル（自己相関経由）
+        <div class="chart-tools">
+          <div class="seg" id="specMode">
+            <button data-m="psd" class="on">PSD</button>
+            <button data-m="db">dB</button>
+            <button data-m="both">両方</button>
+          </div>
+          <button class="btn small" data-png="fqChart">PNG</button>
+        </div>
+      </div>
+      <div class="card-b"><div class="chart-box" style="height:250px"><canvas id="fqChart"></canvas></div></div>
+    </div>
+  </div>
+</div>
+
+<footer>Flame Flicker Frequency Analyzer ・ すべての解析はブラウザ内で完結します（動画は外部送信されません）</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   Flame Flicker Frequency Analyzer
+   ROI輝度RMS → 変動成分 → FFT / 自己相関(Wiener–Khinchin) →
+   自己相関のFFT → ピーク周波数特定
+   ============================================================ */
+
+const $ = id => document.getElementById(id);
+const video = $("video"), stage = $("stage"), roiBox = $("roiBox");
+
+/* ---------------- State ---------------- */
+let items = [];            // {id,file,url,name,w,h,fps,status,roi:{x,y,w,h},result}
+let activeId = null;
+let analyzing = false;
+let charts = {};
+let specModeState = "psd";
+
+const uid = () => Math.random().toString(36).slice(2,10);
+const active = () => items.find(it => it.id === activeId) || null;
+const fmt = (v,d=2) => (v==null||!isFinite(v)) ? "—" : v.toFixed(d);
+
+/* ================= Theme ================= */
+$("themeBtn").onclick = () => {
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark";
+  restyleCharts();
+};
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ================= Import ================= */
+const dz = $("dropzone"), fi = $("fileInput");
+dz.onclick = () => fi.click();
+dz.ondragover = e => { e.preventDefault(); dz.classList.add("over"); };
+dz.ondragleave = () => dz.classList.remove("over");
+dz.ondrop = e => { e.preventDefault(); dz.classList.remove("over"); addFiles(e.dataTransfer.files); };
+fi.onchange = () => { addFiles(fi.files); fi.value = ""; };
+
+function addFiles(list){
+  for (const f of list){
+    if (!/\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(f.name) && !f.type.startsWith("video")) continue;
+    const it = { id: uid(), file: f, url: URL.createObjectURL(f), name: f.name,
+                 w: 0, h: 0, fps: null, status: "未解析", roi: null, result: null,
+                 loadError: false, errorMsg: null };
+    items.push(it);
+  }
+  renderQueue();
+  if (!activeId && items.length) selectItem(items[0].id);
+}
+
+/* ステージ上に表示する、非対応フォーマット用の案内UI（PC側での事前変換を促す） */
+function showLoadErrorGuide(it){
+  video.style.display = "none"; roiBox.style.display = "none";
+  $("playBtn").disabled = $("seekBar").disabled = true;
+  $("startBtn").disabled = true;
+  $("vidMeta").textContent = "読み込み失敗";
+
+  const ph = $("stagePh");
+  ph.style.display = "block";
+  ph.innerHTML = `
+    <div class="stage-error">
+      <div class="head"><span class="x">✕</span>動画の読み込みに失敗しました（.avi 等はブラウザ非対応）</div>
+      <p>ご使用のブラウザは <code>.avi</code> や無圧縮・特殊コーデックの動画を直接再生できません。</p>
+      <div class="fix">
+        <div class="k">解決策</div>
+        <p style="margin-bottom:0">手元のPCで <code>.mp4</code>（H.264 + AAC 推奨）または <code>.webm</code> 形式に変換してから、再度ドラッグ＆ドロップしてください。</p>
+      </div>
+      <div class="fix">
+        <div class="k">一括変換コマンド例（FFmpeg）</div>
+        <p style="margin-bottom:0"><code>ffmpeg -i input${it.name.match(/\.[^.]+$/)?.[0] || ".avi"} -c:v libx264 -pix_fmt yuv420p -c:a aac output.mp4</code></p>
+        <p style="margin-bottom:0; margin-top:6px; color:var(--text-3)">フォルダ内を一括変換する場合（bash例）:<br><code>for f in *.avi; do ffmpeg -i "$f" -c:v libx264 -pix_fmt yuv420p -c:a aac "\${f%.avi}.mp4"; done</code></p>
+      </div>
+      <div class="fname">対象ファイル: ${escHtml(it.name)}</div>
+    </div>`;
+}
+
+function clearLoadErrorGuide(){
+  const ph = $("stagePh");
+  ph.innerHTML = "左のキューから動画を選択すると、ここにプレビューとROI枠が表示されます";
+}
+
+/* ================= Queue ================= */
+function renderQueue(){
+  const q = $("queue");
+  $("qCount").textContent = items.length + " 件";
+  if (!items.length){ q.innerHTML = '<div class="empty-q">動画が未登録です</div>'; return; }
+  q.innerHTML = "";
+  for (const it of items){
+    const el = document.createElement("div");
+    el.className = "qcard" + (it.id===activeId ? " active" : "") + (it.loadError ? " error" : "");
+    const stCls = it.status==="解析中" ? "running" : it.status==="完了" ? "done" : it.loadError ? "error" : "";
+    el.innerHTML = `
+      <div class="name">${escHtml(it.name)}</div>
+      <button class="del" title="削除">✕</button>
+      <div class="meta mono">
+        <span>${it.w ? it.w+"×"+it.h : (it.loadError ? "解像度不明" : "…")}</span>
+        <span>${it.fps ? "コンテナ "+it.fps+" fps（目安）" : (it.loadError ? "—" : "読込中…")}</span>
+      </div>
+      <span class="status ${stCls}">${it.status}${it.result ? " ・ "+fmt(it.result.peakF,2)+" Hz" : ""}</span>`;
+    el.onclick = e => { if (!e.target.classList.contains("del")) selectItem(it.id); };
+    el.querySelector(".del").onclick = () => removeItem(it.id);
+    q.appendChild(el);
+  }
+}
+function escHtml(s){ return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function removeItem(id){
+  if (analyzing) return;
+  const i = items.findIndex(x=>x.id===id);
+  if (i<0) return;
+  URL.revokeObjectURL(items[i].url);
+  items.splice(i,1);
+  if (activeId===id){ activeId = null; if (items.length) selectItem(items[0].id); else clearStage(); }
+  renderQueue();
+}
+
+function selectItem(id){
+  if (analyzing) return;
+  activeId = id;
+  renderQueue();
+  const it = active();
+  if (it && it.loadError) showLoadErrorGuide(it);
+  else { clearLoadErrorGuide(); loadActiveIntoStage(); }
+}
+
+function clearStage(){
+  video.style.display = "none"; roiBox.style.display = "none";
+  clearLoadErrorGuide();
+  $("stagePh").style.display = "block";
+  $("vidMeta").textContent = "—";
+  $("playBtn").disabled = $("seekBar").disabled = true;
+  $("startBtn").disabled = true;
+}
+
+function loadActiveIntoStage(){
+  const it = active(); if (!it) return clearStage();
+  if (it.loadError) return showLoadErrorGuide(it);
+  clearLoadErrorGuide();
+  $("stagePh").style.display = "none";
+  video.style.display = "block";
+  if (video.src !== it.url){ video.src = it.url; video.load(); }
+  video.onloadedmetadata = () => {
+    it.w = video.videoWidth; it.h = video.videoHeight;
+    it.fps = it.fps || 30; // コンテナFPSは表示用の目安。実撮影dtはユーザーがサイドバーで手動指定。
+    it.loadError = false; it.errorMsg = null;
+    $("vidMeta").textContent = `${it.w}×${it.h} ・ コンテナ ${it.fps} fps（目安） ・ ${video.duration.toFixed(2)} s`;
+    $("playBtn").disabled = $("seekBar").disabled = false;
+    $("startBtn").disabled = false;
+    if (!it.roi) it.roi = { x: Math.round(it.w*0.3), y: Math.round(it.h*0.3), w: Math.round(it.w*0.4), h: Math.round(it.h*0.4) };
+    syncDt(it);
+    updateRoiUI();
+    renderQueue();
+    if (it.result) showResult(it);
+  };
+  if (video.readyState >= 1 && video.videoWidth) video.onloadedmetadata();
+  video.onerror = () => {
+    const cur = active(); if (!cur || cur.id !== activeId) return;
+    cur.status = "読み込み失敗"; cur.loadError = true;
+    renderQueue();
+    showLoadErrorGuide(cur);
+  };
+}
+
+function syncDt(it){
+  if ($("autoDt").checked && it && it.fps){
+    $("dtInput").value = (1/it.fps).toFixed(6);
+  }
+}
+$("autoDt").onchange = () => { $("dtInput").disabled = $("autoDt").checked; syncDt(active()); };
+$("allFrames").onchange = () => { $("frameLimit").disabled = $("allFrames").checked; };
+
+/* ================= Player ================= */
+$("playBtn").onclick = () => { video.paused ? video.play() : video.pause(); };
+video.onplay  = () => $("playBtn").textContent = "❚❚";
+video.onpause = () => $("playBtn").textContent = "▶";
+video.ontimeupdate = () => {
+  if (!video.duration) return;
+  $("seekBar").value = video.currentTime / video.duration * 1000;
+  $("tcode").textContent = tc(video.currentTime) + " / " + tc(video.duration);
+};
+$("seekBar").oninput = () => { if (video.duration) video.currentTime = $("seekBar").value/1000 * video.duration; };
+function tc(s){
+  const m = Math.floor(s/60), ss = s - m*60;
+  return String(m).padStart(2,"0") + ":" + ss.toFixed(3).padStart(6,"0");
+}
+
+/* ================= ROI overlay (drag / resize) ================= */
+const roiInputs = { x:$("roiX"), y:$("roiY"), w:$("roiW"), h:$("roiH") };
+const roiMm = { x:$("roiXmm"), y:$("roiYmm"), w:$("roiWmm"), h:$("roiHmm") };
+
+function vScale(){ // 表示px / 動画px
+  const r = video.getBoundingClientRect();
+  return video.videoWidth ? r.width / video.videoWidth : 1;
+}
+function videoOffset(){ // stage内でのvideo表示位置
+  const sr = stage.getBoundingClientRect(), vr = video.getBoundingClientRect();
+  return { left: vr.left - sr.left, top: vr.top - sr.top };
+}
+
+function updateRoiUI(){
+  const it = active(); if (!it || !it.roi || !video.videoWidth){ roiBox.style.display="none"; return; }
+  clampRoi(it);
+  const s = vScale(), o = videoOffset(), r = it.roi;
+  roiBox.style.display = "block";
+  roiBox.style.left   = (o.left + r.x*s) + "px";
+  roiBox.style.top    = (o.top  + r.y*s) + "px";
+  roiBox.style.width  = (r.w*s) + "px";
+  roiBox.style.height = (r.h*s) + "px";
+  $("roiLbl").textContent = `ROI ${r.x},${r.y}  ${r.w}×${r.h}px`;
+  const mm = parseFloat($("mmPerPx").value) || 0;
+  for (const k of ["x","y","w","h"]){
+    if (document.activeElement !== roiInputs[k]) roiInputs[k].value = r[k];
+    if (document.activeElement !== roiMm[k]) roiMm[k].value = mm ? (r[k]*mm).toFixed(2) : "";
+  }
+}
+function clampRoi(it){
+  const r = it.roi;
+  r.w = Math.max(4, Math.min(Math.round(r.w), it.w||1e9));
+  r.h = Math.max(4, Math.min(Math.round(r.h), it.h||1e9));
+  r.x = Math.max(0, Math.min(Math.round(r.x), (it.w||1e9) - r.w));
+  r.y = Math.max(0, Math.min(Math.round(r.y), (it.h||1e9) - r.h));
+}
+
+for (const k of ["x","y","w","h"]){
+  roiInputs[k].oninput = () => {
+    const it = active(); if (!it) return;
+    const v = parseFloat(roiInputs[k].value); if (!isFinite(v)) return;
+    it.roi[k] = v; updateRoiUI();
+  };
+  roiMm[k].oninput = () => {
+    const it = active(); if (!it) return;
+    const mm = parseFloat($("mmPerPx").value) || 0; if (!mm) return;
+    const v = parseFloat(roiMm[k].value); if (!isFinite(v)) return;
+    it.roi[k] = v / mm; updateRoiUI();
+  };
+}
+$("mmPerPx").oninput = updateRoiUI;
+
+let drag = null;
+roiBox.addEventListener("pointerdown", e => {
+  const it = active(); if (!it || analyzing) return;
+  e.preventDefault(); e.stopPropagation();
+  roiBox.setPointerCapture(e.pointerId);
+  drag = { mode: e.target.dataset.h || "move", sx: e.clientX, sy: e.clientY, r0: {...it.roi} };
+});
+roiBox.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const it = active(); if (!it) return;
+  const s = vScale();
+  const dx = (e.clientX - drag.sx)/s, dy = (e.clientY - drag.sy)/s;
+  const r0 = drag.r0, r = it.roi, m = drag.mode;
+  if (m === "move"){ r.x = r0.x + dx; r.y = r0.y + dy; }
+  else {
+    if (m.includes("e")) r.w = r0.w + dx;
+    if (m.includes("s")) r.h = r0.h + dy;
+    if (m.includes("w")){ r.x = r0.x + dx; r.w = r0.w - dx; }
+    if (m.includes("n")){ r.y = r0.y + dy; r.h = r0.h - dy; }
+    if (r.w < 4){ if (m.includes("w")) r.x = r0.x + r0.w - 4; r.w = 4; }
+    if (r.h < 4){ if (m.includes("n")) r.y = r0.y + r0.h - 4; r.h = 4; }
+  }
+  updateRoiUI();
+});
+const endDrag = e => { drag = null; };
+roiBox.addEventListener("pointerup", endDrag);
+roiBox.addEventListener("pointercancel", endDrag);
+window.addEventListener("resize", updateRoiUI);
+video.addEventListener("loadeddata", updateRoiUI);
+
+/* ================= FFT (radix-2 in-place) ================= */
+function fftInplace(re, im, inverse){
+  const n = re.length;
+  for (let i=1, j=0; i<n; i++){
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j){ [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
+  }
+  for (let len=2; len<=n; len<<=1){
+    const ang = (inverse ? 2 : -2) * Math.PI / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i=0; i<n; i+=len){
+      let cwr = 1, cwi = 0;
+      for (let k=0; k<len/2; k++){
+        const ur = re[i+k], ui = im[i+k];
+        const vr = re[i+k+len/2]*cwr - im[i+k+len/2]*cwi;
+        const vi = re[i+k+len/2]*cwi + im[i+k+len/2]*cwr;
+        re[i+k] = ur+vr; im[i+k] = ui+vi;
+        re[i+k+len/2] = ur-vr; im[i+k+len/2] = ui-vi;
+        const t = cwr*wr - cwi*wi; cwi = cwr*wi + cwi*wr; cwr = t;
+      }
+    }
+  }
+  if (inverse) for (let i=0;i<n;i++){ re[i]/=n; im[i]/=n; }
+}
+const nextPow2 = n => 1 << Math.ceil(Math.log2(Math.max(2,n)));
+
+/* 自己相関：R(τ)=real(IFFT(|FFT(x)|²))、線形相関にするため2N長へゼロ詰め */
+function autocorr(x){
+  const N = x.length, M = nextPow2(2*N);
+  const re = new Float64Array(M), im = new Float64Array(M);
+  re.set(x);
+  fftInplace(re, im, false);
+  for (let i=0;i<M;i++){ const p = re[i]*re[i] + im[i]*im[i]; re[i]=p; im[i]=0; }
+  fftInplace(re, im, true);
+  const R = new Float64Array(N);
+  const R0 = re[0] || 1;
+  for (let i=0;i<N;i++) R[i] = re[i] / R0;
+  return R;
+}
+
+/* 実信号のパワースペクトル {freq[], power[]}（k=0..M/2） */
+function powerSpectrum(x, dt){
+  const N = x.length, M = nextPow2(N);
+  const re = new Float64Array(M), im = new Float64Array(M);
+  re.set(x);
+  fftInplace(re, im, false);
+  const half = M/2;
+  const freq = new Float64Array(half+1), pow = new Float64Array(half+1);
+  for (let k=0;k<=half;k++){
+    freq[k] = k / (M*dt);
+    pow[k]  = (re[k]*re[k] + im[k]*im[k]) * dt / M;   // PSD相当（任意単位）
+  }
+  return { freq, pow, M };
+}
+
+/* ================= Analysis ================= */
+$("startBtn").onclick = () => runAnalysis().catch(err => {
+  alert("解析中にエラーが発生しました: " + err.message);
+  finishAnalysisUI();
+});
+
+async function runAnalysis(){
+  const it = active();
+  if (!it || analyzing || !video.videoWidth) return;
+  clampRoi(it);
+  const dt = parseFloat($("dtInput").value);
+  if (!isFinite(dt) || dt <= 0) return alert("dt が不正です");
+  // 解析は必ず「dt秒ごと」に正確にシークして行う（コンテナFPSは表示用の目安に過ぎず、
+  // 実際の時間軸はユーザーが指定したdtを厳密に用いる。cv2.CAP_PROP_POS_FRAMESでの
+  // 逐次フレーム読み出しに相当する挙動を、シーク+seekedイベント待機で再現する）。
+  const totalFrames = Math.max(1, Math.floor(video.duration / dt));
+  let N = $("allFrames").checked ? totalFrames
+        : Math.min(parseInt($("frameLimit").value)||1000, totalFrames);
+  if (N < 16) return alert("フレーム数が少なすぎます（16以上）");
+
+  analyzing = true;
+  it.status = "解析中"; renderQueue();
+  $("startBtn").disabled = true;
+  video.pause();
+  $("prog").style.display = "block"; $("progTxt").style.display = "block";
+
+  const r = it.roi;
+  const cvs = document.createElement("canvas");
+  cvs.width = r.w; cvs.height = r.h;
+  const ctx = cvs.getContext("2d", { willReadFrequently: true });
+
+  const rms = new Float64Array(N);
+  const t0 = performance.now();
+
+  for (let i=0; i<N; i++){
+    const target = Math.min(i * dt, video.duration - 1e-4);
+
+    // 1. シーク完了（seekedイベント）を確実に待つ
+    await seekTo(target);
+
+    // 2. ブラウザがビデオフレームをキャンバス用テクスチャにデコード反映するための
+    //    「物理的な時間的猶予（30ms）」を強制的に確保する（重要：コマ重複を100%防ぐ）。
+    //    rVFCやrAFはプログラム的シークとの発火順序が環境により不定で空振りし得るため
+    //    使用せず、ブラウザ仕様に依存しない固定ディレイで確実に同期させる。
+    await new Promise(resolve => setTimeout(resolve, 30));
+
+    // 3. デコードが確実に完了したビデオ要素からキャンバスへ描画
+    ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    const d = ctx.getImageData(0, 0, r.w, r.h).data;
+    let sumSq = 0;
+    for (let p=0; p<d.length; p+=4){
+      const g = 0.299*d[p] + 0.587*d[p+1] + 0.114*d[p+2];
+      sumSq += g*g;
+    }
+    rms[i] = Math.sqrt(sumSq / (r.w * r.h));
+
+    // 進捗の更新（16フレームに1回にして処理速度を最大化、UIフリーズも防止）
+    if ((i & 15) === 0 || i === N-1){
+      const pct = (i+1)/N*100;
+      $("progBar").style.width = pct + "%";
+      const el = (performance.now()-t0)/1000;
+      const eta = el/(i+1)*(N-i-1);
+      $("progTxt").textContent = `フレーム ${i+1} / ${N}（${pct.toFixed(1)}%）  経過 ${el.toFixed(1)}s / 残り約 ${eta.toFixed(0)}s`;
+      await new Promise(res => setTimeout(res, 1)); // UIスレッドの解放
+    }
+  }
+
+  /* --- 統計と変動成分 --- */
+  let mean = 0; for (const v of rms) mean += v; mean /= N;
+  let varr = 0; for (const v of rms) varr += (v-mean)*(v-mean); varr /= N;
+  const std = Math.sqrt(varr), cv = mean ? std/mean : 0;
+  const fluc = new Float64Array(N);
+  for (let i=0;i<N;i++) fluc[i] = rms[i] - mean;
+
+  /* --- 直接FFT（参考） / 自己相関 / 自己相関のFFT --- */
+  const directSpec = powerSpectrum(fluc, dt);
+  const R = autocorr(fluc);
+  const acSpec = powerSpectrum(R, dt);
+
+  /* --- ピーク特定（0 Hzを除く） --- */
+  let pk = 1;
+  for (let k=2; k<acSpec.pow.length; k++) if (acSpec.pow[k] > acSpec.pow[pk]) pk = k;
+  const peakF = acSpec.freq[pk];
+  const nyq = 1/(2*dt);
+
+  it.result = { dt, N, rms:Array.from(rms), fluc:Array.from(fluc),
+                mean, std, cv, R:Array.from(R),
+                acFreq:Array.from(acSpec.freq), acPow:Array.from(acSpec.pow),
+                dirFreq:Array.from(directSpec.freq), dirPow:Array.from(directSpec.pow),
+                peakF, peakPow:acSpec.pow[pk], nyq };
+  it.status = "完了";
+  finishAnalysisUI();
+  renderQueue();
+  showResult(it);
+}
+
+function seekTo(t){
+  return new Promise(res => {
+    let done = false;
+    const on = () => { if (done) return; done = true; video.removeEventListener("seeked", on); res(); };
+    video.addEventListener("seeked", on);
+    if (Math.abs(video.currentTime - t) < 1e-6){ on(); return; }
+    video.currentTime = t;
+    setTimeout(on, 1500); // フォールバック
+  });
+}
+
+function finishAnalysisUI(){
+  analyzing = false;
+  $("startBtn").disabled = !active();
+  $("prog").style.display = "none"; $("progTxt").style.display = "none";
+  $("progBar").style.width = "0%";
+}
+
+/* ================= Results & Charts ================= */
+function showResult(it){
+  const R = it.result; if (!R) return;
+  $("resVideoName").textContent = it.name;
+  $("peakVal").innerHTML = fmt(R.peakF, 2) + "<small> Hz</small>";
+  $("stMean").innerHTML  = fmt(R.mean,2) + ' <span class="u">a.u.</span>';
+  $("stStd").innerHTML   = fmt(R.std,3)  + ' <span class="u">a.u.</span>';
+  $("stCv").innerHTML    = fmt(R.cv*100,2) + ' <span class="u">%</span>';
+  $("stNyq").innerHTML   = fmt(R.nyq,1) + ' <span class="u">Hz</span>';
+  $("stFrames").innerHTML= R.N + ' <span class="u">fr</span> / ' + R.dt.toPrecision(4) + ' <span class="u">s</span>';
+  $("stDf").innerHTML    = fmt(1/(R.N*R.dt),3) + ' <span class="u">Hz</span>';
+
+  const jr = $("judgeRow"), jb = $("judgeBadge");
+  jr.style.display = "flex";
+  jr.classList.remove("ok","mid","bad");
+  if (R.cv < 0.02){ jr.classList.add("ok"); jb.textContent = "安定"; }
+  else if (R.cv < 0.08){ jr.classList.add("mid"); jb.textContent = "微小振動"; }
+  else { jr.classList.add("bad"); jb.textContent = "激しい自励振動"; }
+
+  const w = $("aliasWarn");
+  if (R.peakF > 0.8*R.nyq){
+    w.style.display = "block";
+    w.textContent = `⚠ エイリアシング警告: ピーク周波数 ${fmt(R.peakF,1)} Hz がナイキスト周波数 ${fmt(R.nyq,1)} Hz の80%を超えています。真の振動が fN を超え、折り返し（偽ピーク）が生じている可能性があります。より高いフレームレート（小さいdt）での再撮影を推奨します。`;
+  } else if (R.peakF > 0.5*R.nyq){
+    w.style.display = "block";
+    w.textContent = `ℹ ピーク周波数がナイキスト周波数の50%を超えています。高調波成分の折り返し混入に注意してください（fN = ${fmt(R.nyq,1)} Hz）。`;
+  } else w.style.display = "none";
+
+  $("exportCsvBtn").disabled = false;
+  drawCharts(it);
+}
+
+function decimate(xs, ys, maxPts=1600){
+  if (xs.length <= maxPts) return { x: xs, y: ys };
+  const step = Math.ceil(xs.length / maxPts), X=[], Y=[];
+  for (let i=0;i<xs.length;i+=step){ X.push(xs[i]); Y.push(ys[i]); }
+  return { x: X, y: Y };
+}
+
+/* ピーク位置の垂直点線+ラベルを描くプラグイン */
+const peakLinePlugin = {
+  id: "peakLine",
+  afterDatasetsDraw(chart, args, opts){
+    if (!opts || opts.x == null) return;
+    const xs = chart.scales.x;
+    if (!xs || opts.x < xs.min || opts.x > xs.max) return;
+    const px = xs.getPixelForValue(opts.x);
+    const { top, bottom } = chart.chartArea;
+    const c = chart.ctx;
+    c.save();
+    c.setLineDash([5,4]);
+    c.strokeStyle = opts.color; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(px, top); c.lineTo(px, bottom); c.stroke();
+    c.setLineDash([]);
+    c.font = "700 11px ui-monospace,monospace";
+    c.fillStyle = opts.color;
+    c.textAlign = px > (xs.left + xs.width*0.75) ? "right" : "left";
+    c.fillText(` fpeak = ${opts.x.toFixed(2)} Hz `, px + (c.textAlign==="left"?5:-5), top + 13);
+    c.restore();
+  }
+};
+Chart.register(peakLinePlugin);
+
+function baseOpts(xTitle, yTitle){
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
+    interaction: { mode: "nearest", intersect: false },
+    plugins: {
+      legend: { labels: { color: cssVar("--text-2"), boxWidth: 14, font: { size: 11 } } },
+      tooltip: { backgroundColor: cssVar("--panel-2"), titleColor: cssVar("--text"),
+                 bodyColor: cssVar("--text-2"), borderColor: cssVar("--border"), borderWidth: 1 }
+    },
+    scales: {
+      x: { type: "linear", title: { display: true, text: xTitle, color: cssVar("--text-2"), font:{size:11} },
+           grid: { color: cssVar("--chart-grid") }, ticks: { color: cssVar("--chart-tick"), font:{size:10}, maxTicksLimit: 9 } },
+      y: { title: { display: true, text: yTitle, color: cssVar("--text-2"), font:{size:11} },
+           grid: { color: cssVar("--chart-grid") }, ticks: { color: cssVar("--chart-tick"), font:{size:10} } }
+    }
+  };
+}
+
+function drawCharts(it){
+  const R = it.result;
+  const acc = cssVar("--accent"), grn = cssVar("--green"), blu = cssVar("--blue");
+
+  /* 1. 時系列輝度変動 */
+  const tArr = R.fluc.map((_,i)=> i*R.dt);
+  const ts = decimate(tArr, R.fluc);
+  makeChart("tsChart", {
+    type: "line",
+    data: { datasets: [{ label: "輝度変動成分 x′(t) = x − ⟨x⟩", data: ts.x.map((x,i)=>({x, y: ts.y[i]})),
+      borderColor: acc, borderWidth: 1.2, pointRadius: 0, fill: false }] },
+    options: baseOpts("時間 t [s]", "輝度変動 [a.u.]")
+  });
+
+  /* 2. 自己相関 */
+  const lag = R.R.map((_,i)=> i*R.dt);
+  const ac = decimate(lag, R.R);
+  const acOpt = baseOpts("ラグ時間 τ [s]", "自己相関係数 R̂(τ)");
+  acOpt.scales.y.min = -1.1; acOpt.scales.y.max = 1.1;
+  makeChart("acChart", {
+    type: "line",
+    data: { datasets: [{ label: "正規化自己相関 R̂(τ)", data: ac.x.map((x,i)=>({x, y: ac.y[i]})),
+      borderColor: grn, borderWidth: 1.3, pointRadius: 0, fill: false }] },
+    options: acOpt
+  });
+
+  /* 3. 周波数スペクトル */
+  drawSpecChart(it);
+}
+
+function drawSpecChart(it){
+  const R = it.result; if (!R) return;
+  const acc = cssVar("--accent"), blu = cssVar("--blue");
+  const half = R.acFreq.length;
+  const fMax = Math.min(R.nyq, Math.max(R.peakF*4, 50));
+  const F=[], P=[], D=[];
+  let pMax = 0;
+  for (let k=1;k<half;k++) if (R.acFreq[k]<=fMax && R.acPow[k]>pMax) pMax = R.acPow[k];
+  pMax = pMax || 1;
+  for (let k=1;k<half;k++){
+    const f = R.acFreq[k]; if (f > fMax) break;
+    F.push(f); P.push(R.acPow[k]);
+    D.push(10*Math.log10(Math.max(R.acPow[k]/pMax, 1e-12)));
+  }
+  const mode = specModeState;
+  const ds = [];
+  if (mode==="psd" || mode==="both")
+    ds.push({ label:"PSD（確率密度・Power）", yAxisID:"y", data:F.map((x,i)=>({x,y:P[i]})),
+      borderColor: acc, backgroundColor: acc+"33", borderWidth:1.4, pointRadius:0, fill: mode==="psd" });
+  if (mode==="db" || mode==="both")
+    ds.push({ label:"パワースペクトル強度 [dB re max]", yAxisID: mode==="both" ? "y2" : "y",
+      data:F.map((x,i)=>({x,y:D[i]})), borderColor: blu, borderWidth:1.3, pointRadius:0, fill:false });
+
+  const opt = baseOpts("周波数 f [Hz]", mode==="db" ? "強度 [dB]" : "PSD [a.u.]");
+  opt.plugins.peakLine = { x: R.peakF, color: cssVar("--red") };
+  if (mode==="both"){
+    opt.scales.y2 = { position:"right", title:{display:true, text:"強度 [dB]", color: cssVar("--text-2"), font:{size:11}},
+      grid:{ drawOnChartArea:false }, ticks:{ color: cssVar("--chart-tick"), font:{size:10} } };
+  }
+  makeChart("fqChart", { type:"line", data:{ datasets: ds }, options: opt });
+}
+
+function makeChart(id, cfg){
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart($(id).getContext("2d"), cfg);
+}
+function restyleCharts(){ const it = active(); if (it && it.result) drawCharts(it); }
+
+$("specMode").querySelectorAll("button").forEach(b => {
+  b.onclick = () => {
+    $("specMode").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    specModeState = b.dataset.m;
+    const it = active(); if (it && it.result) drawSpecChart(it);
+  };
+});
+
+/* ================= Export ================= */
+$("exportCsvBtn").onclick = () => {
+  const it = active(); if (!it || !it.result) return;
+  const R = it.result;
+  const rows = [["# Flame Flicker Frequency Analyzer"],
+    ["# video", it.name], ["# roi_x,y,w,h", it.roi.x, it.roi.y, it.roi.w, it.roi.h],
+    ["# dt_s", R.dt], ["# frames", R.N], ["# mean_luminance", R.mean], ["# std", R.std],
+    ["# fluctuation_intensity", R.cv], ["# peak_frequency_Hz", R.peakF], ["# nyquist_Hz", R.nyq], [""],
+    ["time_s","rms_luminance","fluctuation","","lag_s","autocorr","","freq_Hz","psd_autocorr","psd_dB_re_max","psd_direct"]];
+  const half = R.acFreq.length;
+  let pMax = 0; for (let k=1;k<half;k++) pMax = Math.max(pMax, R.acPow[k]); pMax = pMax||1;
+  const n = Math.max(R.N, half);
+  for (let i=0;i<n;i++){
+    const a = i<R.N ? [ (i*R.dt).toFixed(6), R.rms[i].toFixed(6), R.fluc[i].toFixed(6) ] : ["","",""];
+    const b = i<R.N ? [ (i*R.dt).toFixed(6), R.R[i].toFixed(6) ] : ["",""];
+    const c = i<half ? [ R.acFreq[i].toFixed(6), R.acPow[i].toExponential(6),
+                         (10*Math.log10(Math.max(R.acPow[i]/pMax,1e-12))).toFixed(3),
+                         R.dirPow[i].toExponential(6) ] : ["","","",""];
+    rows.push([...a,"",...b,"",...c]);
+  }
+  const csv = rows.map(r=>r.join(",")).join("\n");
+  dl(new Blob(["\uFEFF"+csv], {type:"text/csv"}), it.name.replace(/\.[^.]+$/,"") + "_flicker_analysis.csv");
+};
+
+document.querySelectorAll("[data-png]").forEach(b => {
+  b.onclick = () => {
+    const ch = charts[b.dataset.png]; if (!ch) return alert("先に解析を実行してください");
+    const src = ch.canvas;
+    const out = document.createElement("canvas");
+    out.width = src.width; out.height = src.height;
+    const c = out.getContext("2d");
+    c.fillStyle = cssVar("--panel"); c.fillRect(0,0,out.width,out.height);
+    c.drawImage(src,0,0);
+    out.toBlob(bl => dl(bl, b.dataset.png + "_" + ((active()||{}).name||"chart").replace(/\.[^.]+$/,"") + ".png"));
+  };
+});
+
+function dl(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+</script>
+</body>
+</html>
