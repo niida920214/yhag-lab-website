@@ -67,10 +67,18 @@
         </span>
       </a>
 
-      <nav class="main-nav" id="main-nav" aria-label="グローバルナビゲーション">
-        <a href="index.html" aria-current="page">トップ</a>
-        <a href="tools/flame-analyzer.html">解析ツール（Tools）</a>
-      </nav>
+      <!-- ============================================================
+           年度進捗バー（4/1 〜 翌年3/31 を100%として、今日の位置を表示）
+           数値は assets/js/script.js の renderFiscalProgress() が
+           ページ読み込み時に自動計算します。HTML側の書き換えは不要です。
+      ============================================================ -->
+      <div class="fiscal-progress" aria-label="年度進捗（4月1日を0%、翌年3月31日を100%として計算）">
+        <span class="fiscal-progress-label" data-fiscal-label></span>
+        <div class="fiscal-progress-track">
+          <div class="fiscal-progress-fill" data-fiscal-fill></div>
+        </div>
+        <span class="fiscal-progress-percent" data-fiscal-percent></span>
+      </div>
 
       <div class="header-actions">
         <!-- ============================================================
@@ -95,9 +103,6 @@
         <button class="icon-btn theme-toggle" type="button" aria-pressed="true" aria-label="ダークモードの切り替え">
           <i data-lucide="sun" class="icon-sun"></i>
           <i data-lucide="moon" class="icon-moon"></i>
-        </button>
-        <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="メニューを開閉する">
-          <i data-lucide="menu"></i>
         </button>
       </div>
     </div>

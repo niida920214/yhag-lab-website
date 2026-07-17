@@ -424,6 +424,69 @@ section {
   color: var(--color-primary-strong);
 }
 
+/* ---- Fiscal-year progress bar (header) ---------------------------------
+   Shows how far today is between April 1 and the following March 31.
+   The width/label/percent text are all set by renderFiscalProgress() in
+   assets/js/script.js on page load — nothing here needs manual editing.
+------------------------------------------------------------------------ */
+.fiscal-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 380px;
+  margin-inline: 1.5rem;
+}
+
+.fiscal-progress-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.fiscal-progress-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.fiscal-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--tool-btn-bg), var(--btn-blue-bg));
+  transition: width 0.8s ease;
+}
+
+.fiscal-progress-percent {
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  min-width: 3.6em;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .fiscal-progress {
+    margin-inline: 0.75rem;
+  }
+
+  .fiscal-progress-label {
+    display: none;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;

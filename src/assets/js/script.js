@@ -47,7 +47,36 @@
 
   applyStoredTheme();
 
+  /* ---- Fiscal-year progress bar ------------------------------------------
+   * 4月1日を0%、翌年3月31日の終わりを100%として、今日がその区間の何%の
+   * 位置にいるかを計算して .fiscal-progress の中身に反映する。
+   * -------------------------------------------------------------------- */
+  function renderFiscalProgress() {
+    var fill = document.querySelector("[data-fiscal-fill]");
+    var percentEl = document.querySelector("[data-fiscal-percent]");
+    var labelEl = document.querySelector("[data-fiscal-label]");
+    if (!fill || !percentEl) return;
+
+    var now = new Date();
+    // getMonth() is 0-indexed, so April = 3
+    var fiscalStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    var fiscalStart = new Date(fiscalStartYear, 3, 1, 0, 0, 0, 0);
+    var fiscalEnd = new Date(fiscalStartYear + 1, 2, 31, 23, 59, 59, 999);
+
+    var totalMs = fiscalEnd - fiscalStart;
+    var elapsedMs = now - fiscalStart;
+    var percent = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
+
+    fill.style.width = percent.toFixed(1) + "%";
+    percentEl.textContent = percent.toFixed(1) + "%";
+    if (labelEl) {
+      labelEl.textContent = fiscalStartYear + "年度";
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    renderFiscalProgress();
+
     document.querySelectorAll(".theme-toggle").forEach(function (btn) {
       btn.setAttribute("aria-pressed", String(currentTheme() === "dark"));
       btn.addEventListener("click", toggleTheme);
