@@ -31,6 +31,11 @@
   <link rel="stylesheet" href="assets/css/style.css" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js" defer></script>
   <script src="assets/js/script.js" defer></script>
+
+  <!-- Vercel Web Analytics（アクセス解析）
+       Vercel上で配信されたときだけ動作する計測タグです。
+       ローカルで開いた場合は読み込みに失敗しますが、無害（エラー表示のみ）です。 -->
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">メインコンテンツへ移動</a>
@@ -112,9 +117,21 @@
          【編集ガイド】各カラム内のボタンについて
          ・文字を変える　　　→ ボタンのテキスト部分をそのまま書き換えるだけでOK
          ・リンク先を変える　→ <a> タグの href="..." を書き換えるだけでOK
-         ・ボタンを増やす　　→ 1個分のブロック（<a class="tool-btn">...</a> または
-                               <button class="tool-btn">...</button>）をコピー＆
-                               ペーストして、中身を書き換えるだけでOK
+         ・ボタンを増やす　　→ 新しいボタンは各カラムの <div class="tool-btn-list">
+                               の直後（一番上）に貼り付けてください。上に貼るほど
+                               新しいボタンが一番上に表示されます。コメントの
+                               「Button 1」などの番号は人間が読むための目印なので、
+                               厳密に振り直す必要はありません。
+         ・「NEW！」を付けたい場合　→ <a class="tool-btn"> の中、テキストの後ろに
+           <span class="new-badge">NEW!</span> を追加するだけでOK
+         ・著作権表記／更新日を添えたい場合　→ ボタン（<a class="tool-btn">...</a>）
+           全体を <div class="tool-btn-item"> で囲み、その下に
+           <div class="tool-btn-meta"> を置いて、その中に
+           <p class="tool-btn-author">© 〇〇</p> と
+           <p class="tool-btn-updated">Renewal date: YYYY/MM/DD</p> を
+           追加してください（全ボタンに実例済みなので、それぞれの
+           「© ここに名前を入力」の部分だけ書き換えればOK。不要な行は
+           その<p>ごと削除してOK）
          ・「Upcoming（構築中）」にしたい場合 → class に " is-upcoming" を追加し、
            タグを <button type="button" class="tool-btn is-upcoming" disabled> に
            変更してください（<a> ではなく <button disabled> にすること）
@@ -128,31 +145,59 @@
           <div class="tool-column">
             <h3>お遊び</h3>
             <div class="tool-btn-list">
-              <!-- Button 1 Start（お遊び・Upcoming） -->
-              <button
-                type="button"
-                class="tool-btn is-upcoming"
-                disabled
-                aria-label="お遊びコンテンツ1（Upcoming）"
-                title="Upcoming"
-              >
-                <i data-lucide="hourglass"></i>
-                Upcoming
-              </button>
+              <!-- Button Start：競馬予測AI（NEW！） -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="https://keiba-ai-predict-by8gpwdabdiqntihtqbrgi.streamlit.app/">
+                  <i data-lucide="trophy"></i>
+                  競馬予測AI
+                  <span class="new-badge">NEW!</span>
+                </a>
+                <!-- 著作権表記はここに入力してください（不要ならこの<div>ごと削除でOK） -->
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© miwa</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/16</p>
+                </div>
+              </div>
+              <!-- Button End -->
+
+              <!-- Button 1 Start:体重シミュレーション -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="https://teal-creponne-ce3315.netlify.app/">
+                  <i data-lucide="scale"></i>
+                  体重シミュレーション
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© chiba</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
+                </div>
+              </div>
               <!-- Button 1 End -->
 
-              <!-- Button 2 Start（お遊び・Upcoming） -->
-              <button
-                type="button"
-                class="tool-btn is-upcoming"
-                disabled
-                aria-label="お遊びコンテンツ2（Upcoming）"
-                title="Upcoming"
-              >
-                <i data-lucide="hourglass"></i>
-                Upcoming
-              </button>
+              <!-- Button 2 Start：Market Sentiment 3D -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/market-sentiment-3d_V4.html">
+                  <i data-lucide="trending-up"></i>
+                  市場センチメント
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/13</p>
+                </div>
+              </div>
               <!-- Button 2 End -->
+
+              <!-- Button 3 Start：Tokyo Real Estate Dashboard -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/tokyo_real_estate_dashboard.html">
+                  <i data-lucide="building-2"></i>
+                  東京不動産ダッシュボード
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
+                </div>
+              </div>
+              <!-- Button 3 End -->
             </div>
           </div>
 
@@ -160,20 +205,31 @@
           <div class="tool-column tool-column--dark">
             <h3>教育ツール</h3>
             <div class="tool-btn-list">
-              <!-- Button 1 Start：Camera Setting（リンク先未定。ページ完成後、
-                   下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
-              <button type="button" class="tool-btn">
-                <i data-lucide="camera"></i>
-                Camera Setting
-              </button>
+              <!-- Button 1 Start：Camera Setting -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/camera-setting.html">
+                  <i data-lucide="camera"></i>
+                  Camera Setting
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© chiba</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/15</p>
+                </div>
+              </div>
               <!-- Button 1 End -->
 
               <!-- Button 2 Start：ナビエストークス（リンク先未定。ページ完成後、
                    下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
-              <button type="button" class="tool-btn">
-                <i data-lucide="waves"></i>
-                ナビエストークス
-              </button>
+              <div class="tool-btn-item">
+                <button type="button" class="tool-btn">
+                  <i data-lucide="waves"></i>
+                  ナビエストークス
+                </button>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© --</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/--</p>
+                </div>
+              </div>
               <!-- Button 2 End -->
             </div>
           </div>
@@ -183,19 +239,44 @@
             <h3>実験ツール</h3>
             <div class="tool-btn-list">
               <!-- Button 1 Start：Flame Luminance Analyzer（既存ページへリンク済み） -->
-              <a class="tool-btn" href="tools/flame-analyzer.html">
-                <i data-lucide="flame"></i>
-                Flame Luminance Analyzer
-              </a>
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/flame-analyzer.html">
+                  <i data-lucide="flame"></i>
+                  Flame Luminance Analyzer
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
+                </div>
+              </div>
               <!-- Button 1 End -->
 
               <!-- Button 2 Start：Frequency Analyzer（リンク先未定。ページ完成後、
                    下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
-              <button type="button" class="tool-btn">
-                <i data-lucide="radio"></i>
-                Frequency Analyzer
-              </button>
+              <div class="tool-btn-item">
+                <button type="button" class="tool-btn">
+                  <i data-lucide="radio"></i>
+                  Frequency Analyzer
+                </button>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/16</p>
+                </div>
+              </div>
               <!-- Button 2 End -->
+
+              <!-- Button 3 Start：Experiment Studio -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/experiment_studio_v2.html">
+                  <i data-lucide="flask-conical"></i>
+                  Experiment Studio
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/13</p>
+                </div>
+              </div>
+              <!-- Button 3 End -->
             </div>
           </div>
         </div>

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>インタラクティブ・カメラシミュレーター Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-color: #090d16;
+      --card-bg: #111827;
+      --accent-color: #10b981;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #f1f5f9;
+    }
+
+    /* レンジスライダーのカスタムデザイン */
+    input[type="range"] {
+      accent-color: var(--accent-color);
+    }
+
+    /* デジタルセンサーの電子ノイズレイヤー */
+    .sensor-noise {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.1s ease;
+    }
+
+    /* 低画素化（ドット絵化）時のレンダリング品質 */
+    .pixelated {
+      image-rendering: pixelated;
+    }
+
+    .osd-font {
+      font-family: 'Courier New', Courier, monospace;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.9);
+    }
+  </style>
+  <!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body class="min-h-screen flex flex-col justify-between font-sans">
+
+  <!-- 動的なCMOSセンサーノイズを物理再現するためのSVGフィルター -->
+  <svg class="hidden">
+    <filter id="sensor-grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" />
+      <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.45 0" />
+      <feBlend mode="overlay" in="SourceGraphic" in2="noise" />
+    </filter>
+    <filter id="chroma-grain">
+      <!-- 高画素・超高感度時の赤緑の偽色ノイズ再現 -->
+      <feTurbulence type="turbulence" baseFrequency="0.7" numOctaves="2" result="noise" />
+      <feColorMatrix type="matrix" values="0.9 0 0 1 0  0 0.1 0 1 0  0 0 0.9 1 0  0 0 0 0.4 0" />
+      <feBlend mode="screen" in="SourceGraphic" in2="noise" />
+    </filter>
+  </svg>
+
+  <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 py-4 px-6 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl animate-pulse">📸</span>
+        <div>
+          <h1 class="text-lg font-extrabold text-white tracking-wide">PRO-OPTICS カメラ物理シミュレーター</h1>
+          <p class="text-xs text-slate-400">パラメータの物理的トレードオフを画像に正確かつ美しくリアルタイムに反映します</p>
+        </div>
+      </div>
+      <!-- シーン選択（デフォルトでオンラインの超高精度画像をあてがい、ローカル画像がない場合でも美しく即座に動かします） -->
+      <div class="flex items-center gap-2 bg-slate-800 px-4 py-1.5 rounded-xl border border-slate-700 shadow-lg">
+        <span class="text-xs text-slate-400">撮影画像を選択:</span>
+        <select id="scene-select" class="bg-transparent text-xs text-emerald-400 font-extrabold focus:outline-none cursor-pointer">
+          <option value="scene-sakura" class="bg-slate-900 text-white">シーン1：桜とRX-7 (日中・桜並木)</option>
+          <option value="scene-flowers" class="bg-slate-900 text-white">シーン2：黄色い花畑と雪山 (快晴・マウンテン)</option>
+          <option value="scene-night" class="bg-slate-900 text-white">シーン3：夜の峠道の車 (夜間・低照度)</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow items-start">
+
+    <!-- 左側：ファインダー・画像プレビューエリア（余計なものを置かない） -->
+    <section class="lg:col-span-7 flex flex-col gap-4">
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-850 shadow-2xl flex flex-col items-center">
+        
+        <div class="w-full flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span> Viewfinder (実写ダイレクトプレビュー)
+          </span>
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>手ブレ(手持ち時):</span>
+            <button id="btn-shake-toggle" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-2.5 py-0.5 rounded transition">
+              ON
+            </button>
+          </div>
+        </div>
+
+        <!-- 液晶プレビュー表示部 -->
+        <div class="relative w-full aspect-[4/3] bg-black rounded-xl overflow-hidden border border-slate-950 shadow-inner flex items-center justify-center">
+          
+          <!-- 解像度に合わせて像の中身だけをドット化するリサイズ用コンテナ -->
+          <div id="sensor-container" class="relative w-full h-full overflow-hidden transition-all duration-75">
+            <!-- 像全体の光学ブレ用コンテナ -->
+            <div id="lens-mount" class="relative w-full h-full overflow-hidden">
+              
+              <!-- ユーザーの画像を「そのまま切り抜かずに」1枚絵として表示。プレビューでもすぐに動く高解像度Unsplashフォールバック搭載！ -->
+              <img id="camera-image" src="images.jpg" class="w-full h-full object-cover transition-all" alt="シミュレーション対象画像">
+
+              <!-- CMOSセンサーノイズのオーバーレイ -->
+              <div id="noise-layer" class="sensor-noise"></div>
+
+            </div>
+          </div>
+
+          <!-- 露出アンダー／オーバー用の階調飽和マスク -->
+          <div id="exposure-mask" class="absolute inset-0 pointer-events-none mix-blend-normal transition-all duration-100 opacity-0"></div>
+
+          <!-- OSD 液晶表示 (リアルな情報オーバーレイ) -->
+          <div class="absolute inset-x-0 top-3 px-4 flex justify-between text-[11px] font-mono text-white/70 pointer-events-none osd-font">
+            <div class="bg-black/50 px-2 py-0.5 rounded" id="osd-scene-badge">SCENE: SAKURA</div>
+            <div class="bg-black/50 px-2 py-0.5 rounded flex items-center gap-1">
+              <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> LIVE
+            </div>
+            <div class="bg-black/50 px-2 py-0.5 rounded" id="osd-res-badge">24 MP</div>
+          </div>
+
+          <div class="absolute inset-x-0 bottom-3 px-4 flex justify-between text-[11px] font-mono text-white/70 pointer-events-none osd-font">
+            <div class="bg-black/50 px-2 py-0.5 rounded" id="osd-settings">F2.8 | 1/250s | ISO 400</div>
+            <div class="bg-black/50 px-2 py-0.5 rounded text-emerald-400 font-bold" id="osd-fps">60 FPS</div>
+          </div>
+
+          <!-- グリッド線（切り替えなしで常に薄く表示） -->
+          <div class="absolute inset-0 border border-white/5 pointer-events-none">
+            <div class="absolute left-1/3 top-0 bottom-0 border-l border-white/10 border-dashed"></div>
+            <div class="absolute right-1/3 top-0 bottom-0 border-l border-white/10 border-dashed"></div>
+            <div class="absolute top-1/3 left-0 right-0 border-t border-white/10 border-dashed"></div>
+            <div class="absolute bottom-1/3 left-0 right-0 border-t border-white/10 border-dashed"></div>
+          </div>
+        </div>
+
+        <!-- 実践的な露出レベル計 -->
+        <div class="w-full mt-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <div class="flex justify-between text-xs text-slate-400 mb-1">
+            <span class="font-bold flex items-center gap-1">露出インジケーター</span>
+            <span id="ev-value" class="font-bold text-emerald-400 font-mono">+0.0 EV</span>
+          </div>
+          <div class="relative w-full h-6 bg-slate-900 rounded-md flex items-center px-4 overflow-hidden border border-slate-850">
+            <div class="absolute inset-x-0 flex justify-between px-6 text-[9px] font-mono text-slate-500">
+              <span>-3</span>
+              <span>-2</span>
+              <span>-1</span>
+              <span class="text-slate-400 font-bold">0</span>
+              <span>+1</span>
+              <span>+2</span>
+              <span>+3</span>
+            </div>
+            <!-- 指針 -->
+            <div id="ev-pointer" class="absolute w-0.5 h-4 bg-emerald-400 rounded left-1/2 -translate-x-1/2 transition-all duration-150 ease-out z-10"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 物理アドバイス診断 -->
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-2xl">
+        <h3 class="text-xs font-bold text-white mb-2 flex items-center gap-1.5">
+          <span>🔬</span> 光学・電磁センサー自己診断
+        </h3>
+        <div id="diagnostics" class="space-y-2 text-xs">
+          <!-- アドバイス文がリアルタイムに入ります -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 右側：シンプルな5つのパラメータ調整 -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- 撮影環境（手持ち vs 三脚） -->
+      <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">📸 撮影スタイル</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-mount-hand" class="py-2 px-3 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950">
+            🏃 手持ち撮影
+          </button>
+          <button id="btn-mount-tripod" class="py-2 px-3 rounded-lg text-xs font-bold transition-all bg-slate-800 text-slate-400 hover:text-white">
+            🔭 三脚固定
+          </button>
+        </div>
+      </div>
+
+      <!-- パラメータコントロール -->
+      <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-5">
+        
+        <h2 class="text-sm font-bold text-white border-b border-slate-800 pb-2 flex items-center gap-2">
+          <span>⚙️</span> 露出の3要素 ＆ センサー設定
+        </h2>
+
+        <!-- ① F値（絞り） -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-slate-300">① 絞り値 (F値)</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono" id="lbl-fstop">f/2.8</span>
+          </div>
+          <input id="rng-fstop" type="range" min="0" max="8" step="1" value="2" class="w-full h-1.5 rounded-lg cursor-pointer bg-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono px-1">
+            <span>f/1.4</span>
+            <span>f/2.0</span>
+            <span>f/2.8</span>
+            <span>f/4.0</span>
+            <span>f/5.6</span>
+            <span>f/8.0</span>
+            <span>f/11</span>
+            <span>f/16</span>
+            <span>f/22</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            開く（F1.4）ほどピントの合う範囲が狭くなり全体が柔らかくボケます。絞る（F22）ほど細部までくっきりシャープになりますが、絞りすぎると光の回折（ぼやけ）が始まります。
+          </p>
+        </div>
+
+        <!-- ② シャッタースピード (SS) -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-slate-300">② シャッタースピード (SS)</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono" id="lbl-ss">1/250 秒</span>
+          </div>
+          <input id="rng-ss" type="range" min="0" max="9" step="1" value="5" class="w-full h-1.5 rounded-lg cursor-pointer bg-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono px-1">
+            <span>1s</span>
+            <span>1/2s</span>
+            <span>1/8s</span>
+            <span>1/30s</span>
+            <span>1/125s</span>
+            <span>1/250s</span>
+            <span>1/500s</span>
+            <span>1/2000s</span>
+            <span>1/8000s</span>
+            <span>1/16000s</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            シャッターを開く時間。遅い（1s）ほど光を多く取り込みますが、手持ち撮影時は手のわずかな震えによって全体が大きく流れてブレてしまいます。
+          </p>
+        </div>
+
+        <!-- ③ 動画フレームレート (FPS) -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-slate-300">③ 動画フレームレート (FPS)</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono" id="lbl-fps">60 FPS</span>
+          </div>
+          <input id="rng-fps" type="range" min="0" max="3" step="1" value="3" class="w-full h-1.5 rounded-lg cursor-pointer bg-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono px-1">
+            <span>12 FPS</span>
+            <span>24 FPS (映画)</span>
+            <span>30 FPS (TV)</span>
+            <span>60 FPS (滑らか)</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            1秒間の静止画のコマ数。SSとFPSの比率によって、自然なブレ感を残す映画業界の基本「180度ルール」に適合しているかを診断します。
+          </p>
+        </div>
+
+        <!-- ④ ISO感度 -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-slate-300">④ ISO感度</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono" id="lbl-iso">400</span>
+          </div>
+          <input id="rng-iso" type="range" min="0" max="8" step="1" value="2" class="w-full h-1.5 rounded-lg cursor-pointer bg-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono px-1">
+            <span>100</span>
+            <span>200</span>
+            <span>400</span>
+            <span>800</span>
+            <span>1600</span>
+            <span>3200</span>
+            <span>6400</span>
+            <span>12800</span>
+            <span>25600</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            電気的に明るさを増幅します。高感度にするほど暗い場所でも明るくなりますが、画面全体にザラザラとした電子ノイズ（カラーノイズ・輝度ノイズ）が発生します。
+          </p>
+        </div>
+
+        <!-- ⑤ センサー解像度 (画素数) -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-semibold text-slate-300">⑤ センサー解像度 (画素数)</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono" id="lbl-res">24 MP</span>
+          </div>
+          <input id="rng-res" type="range" min="0" max="4" step="1" value="2" class="w-full h-1.5 rounded-lg cursor-pointer bg-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono px-1">
+            <span>2MP (低画素)</span>
+            <span>12MP (標準)</span>
+            <span>24MP (高画質)</span>
+            <span>50MP (プロ用)</span>
+            <span>100MP (超高画素)</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">
+            解像度を下げると像がモザイク状（ピクセル化）になりますが、受光面積が広くなるため高ISO時のノイズが発生しにくく、手ブレにも極めて強い物理的メリットがあります。
+          </p>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="bg-slate-950 border-t border-slate-900 py-4 px-6 text-center text-xs text-slate-500">
+    <p>© PRO-OPTICS カメラ物理シミュレーター . すべての実写イメージ対応物理演算</p>
+  </footer>
+
+  <script>
+    // ----------------- 光学およびセンサー物理パラメータ定数 -----------------
+    const F_STOPS = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0];
+    const SS_VALUES = [
+      { text: "1秒", val: 1.0 },
+      { text: "1/2秒", val: 0.5 },
+      { text: "1/8秒", val: 0.125 },
+      { text: "1/30秒", val: 0.033 },
+      { text: "1/125秒", val: 0.008 },
+      { text: "1/250秒", val: 0.004 },
+      { text: "1/500秒", val: 0.002 },
+      { text: "1/2000秒", val: 0.0005 },
+      { text: "1/8000秒", val: 0.000125 },
+      { text: "1/16000秒", val: 0.0000625 }
+    ];
+    const ISO_VALUES = [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600];
+    const FPS_VALUES = [12, 24, 30, 60];
+    
+    // 各解像度ごとの受光画素ピッチ（ミクロン）と描画スケール
+    const RES_VALUES = [
+      { text: "2 MP", mp: 2, scale: 12, pitch: 8.4 },
+      { text: "12 MP", mp: 12, scale: 35, pitch: 5.6 },
+      { text: "24 MP", mp: 24, scale: 100, pitch: 4.2 },
+      { text: "50 MP", mp: 50, scale: 100, pitch: 2.9 },
+      { text: "100 MP", mp: 100, scale: 100, pitch: 1.8 }
+    ];
+
+    // ローカルファイルがない場合に備え、Preview環境でも100%美しく動作するように高品質なオンライン画像パスを定義
+    const FALLBACK_SCENE_IMAGES = {
+      "scene-sakura": "images.jpg",
+      "scene-flowers": "images (1).jfif",
+      "scene-night": "images.jfif"
+    };
+
+    const ONLINE_SCENE_IMAGES = {
+      "scene-sakura": "https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&w=1200&q=80", // 桜と日本
+      "scene-flowers": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80", // 雪山と黄色の花畑
+      "scene-night": "https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?auto=format&fit=crop&w=1200&q=80"  // 夜のハイウェイ/峠
+    };
+
+    // ----------------- DOMの取得 -----------------
+    const imgElement = document.getElementById('camera-image');
+    const noiseLayer = document.getElementById('noise-layer');
+    const lensMount = document.getElementById('lens-mount');
+    const sensorContainer = document.getElementById('sensor-container');
+    const exposureMask = document.getElementById('exposure-mask');
+    const sceneSelect = document.getElementById('scene-select');
+
+    const rngFstop = document.getElementById('rng-fstop');
+    const rngSs = document.getElementById('rng-ss');
+    const rngFps = document.getElementById('rng-fps');
+    const rngIso = document.getElementById('rng-iso');
+    const rngRes = document.getElementById('rng-res');
+
+    const lblFstop = document.getElementById('lbl-fstop');
+    const lblSs = document.getElementById('lbl-ss');
+    const lblFps = document.getElementById('lbl-fps');
+    const lblIso = document.getElementById('lbl-iso');
+    const lblRes = document.getElementById('lbl-res');
+
+    const osdSettings = document.getElementById('osd-settings');
+    const osdFps = document.getElementById('osd-fps');
+    const osdResBadge = document.getElementById('osd-res-badge');
+    const osdSceneBadge = document.getElementById('osd-scene-badge');
+    const evValue = document.getElementById('ev-value');
+    const evPointer = document.getElementById('ev-pointer');
+    const diagnosticsPanel = document.getElementById('diagnostics');
+
+    const btnShakeToggle = document.getElementById('btn-shake-toggle');
+    const btnMountHand = document.getElementById('btn-mount-hand');
+    const btnMountTripod = document.getElementById('btn-mount-tripod');
+
+    // ----------------- 状態 -----------------
+    let isShakeActive = true;
+    let cameraMount = 'handheld';
+    let timeX = 0;
+
+    // ----------------- 画像設定とエラーフォールバック処理 -----------------
+    function setCameraImage(sceneKey) {
+      if (!imgElement) return;
+      // まずローカル設定を試みる
+      imgElement.src = FALLBACK_SCENE_IMAGES[sceneKey];
+      
+      // ローカル画像がない場合に自動でオンラインの高解像度画像にフォールバック
+      imgElement.onerror = function() {
+        imgElement.src = ONLINE_SCENE_IMAGES[sceneKey];
+        imgElement.onerror = null; // ループ防止
+      };
+    }
+
+    // 初回ロード時
+    setCameraImage("scene-sakura");
+
+    // シーン変更
+    sceneSelect.addEventListener('change', () => {
+      const selected = sceneSelect.value;
+      setCameraImage(selected);
+      
+      if (osdSceneBadge) {
+        if (selected === 'scene-sakura') osdSceneBadge.textContent = "SCENE: SAKURA";
+        if (selected === 'scene-flowers') osdSceneBadge.textContent = "SCENE: FLOWERS";
+        if (selected === 'scene-night') osdSceneBadge.textContent = "SCENE: NIGHT";
+      }
+      updateSimulation();
+    });
+
+    btnShakeToggle.addEventListener('click', () => {
+      isShakeActive = !isShakeActive;
+      btnShakeToggle.textContent = isShakeActive ? "ON" : "OFF";
+      btnShakeToggle.className = isShakeActive 
+        ? "bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-2.5 py-0.5 rounded transition"
+        : "bg-slate-800 text-slate-400 font-bold px-2.5 py-0.5 rounded transition border border-slate-700";
+    });
+
+    btnMountHand.addEventListener('click', () => {
+      cameraMount = 'handheld';
+      btnMountHand.className = "py-2 px-3 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950";
+      btnMountTripod.className = "py-2 px-3 rounded-lg text-xs font-bold transition-all bg-slate-800 text-slate-400 hover:text-white";
+      updateSimulation();
+    });
+
+    btnMountTripod.addEventListener('click', () => {
+      cameraMount = 'tripod';
+      btnMountTripod.className = "py-2 px-3 rounded-lg text-xs font-bold transition-all bg-emerald-500 text-slate-950";
+      btnMountHand.className = "py-2 px-3 rounded-lg text-xs font-bold transition-all bg-slate-800 text-slate-400 hover:text-white";
+      updateSimulation();
+    });
+
+    // パラメータ変更の全イベント
+    [rngFstop, rngSs, rngFps, rngIso, rngRes].forEach(slider => {
+      slider.addEventListener('input', updateSimulation);
+    });
+
+    // ----------------- コア物理計算・描画 -----------------
+    function updateSimulation() {
+      const selectedScene = sceneSelect.value;
+      const fStop = F_STOPS[parseInt(rngFstop.value)];
+      const ss = SS_VALUES[parseInt(rngSs.value)];
+      const fps = FPS_VALUES[parseInt(rngFps.value)];
+      const iso = ISO_VALUES[parseInt(rngIso.value)];
+      const res = RES_VALUES[parseInt(rngRes.value)];
+
+      // UI文字の更新
+      if (lblFstop) lblFstop.textContent = `f/${fStop}`;
+      if (lblSs) lblSs.textContent = ss.text;
+      if (lblFps) lblFps.textContent = `${fps} FPS`;
+      if (lblIso) lblIso.textContent = iso;
+      if (lblRes) lblRes.textContent = `${res.mp} MP`;
+
+      if (osdSettings) osdSettings.textContent = `f/${fStop} | ${ss.text} | ISO ${iso}`;
+      if (osdFps) osdFps.textContent = `${fps} FPS`;
+      if (osdResBadge) osdResBadge.textContent = `${res.mp} MP`;
+
+      // 1. 【露出決定の物理計算（EV値算出）】
+      // f/2.8, SS 1/250, ISO 400 を基準（EV=0）に設定
+      const L_ref = (400 * 0.004) / (2.8 * 2.8);
+      
+      // シーン別の基準光量
+      // 山・花畑は非常に明るく（+10段）、夜の峠は極端に暗い（-4.5段）
+      let sceneBrightnessFactor = 1.0;
+      if (selectedScene === 'scene-flowers') sceneBrightnessFactor = 1024; // 10段分
+      if (selectedScene === 'scene-night') sceneBrightnessFactor = 0.04;    // -4.5段分
+
+      const L_cur = (iso * ss.val * sceneBrightnessFactor) / (fStop * fStop);
+      const evDiff = Math.log2(L_cur / L_ref);
+
+      // 露出計インジケーター針
+      const needlePercent = Math.max(10, Math.min(90, 50 + (evDiff * 13.33)));
+      if (evPointer) evPointer.style.left = `${needlePercent}%`;
+      if (evValue) {
+        evValue.textContent = (evDiff >= 0 ? "+" : "") + evDiff.toFixed(1) + " EV";
+        if (Math.abs(evDiff) <= 1.0) {
+          evValue.className = "font-bold text-emerald-400 font-mono";
+          if (evPointer) evPointer.className = "absolute w-0.5 h-4 bg-emerald-400 rounded left-1/2 -translate-x-1/2 transition-all duration-150 ease-out z-10";
+        } else {
+          evValue.className = "font-bold text-rose-500 font-mono";
+          if (evPointer) evPointer.className = "absolute w-0.5 h-4 bg-rose-500 rounded left-1/2 -translate-x-1/2 transition-all duration-150 ease-out z-10";
+        }
+      }
+
+      // 明るさ変更用のCSS
+      let cssBrightness = Math.min(2.5, Math.max(0.1, Math.sqrt(Math.pow(2, evDiff))));
+      
+      // 白飛びクリップと黒潰れの適用
+      if (evDiff > 1.8) {
+        const whiteClip = Math.min(0.85, (evDiff - 1.8) * 0.22);
+        if (exposureMask) {
+          exposureMask.style.backgroundColor = 'white';
+          exposureMask.style.opacity = whiteClip;
+        }
+      } else if (evDiff < -1.8) {
+        const blackClip = Math.min(0.95, (Math.abs(evDiff) - 1.8) * 0.22);
+        if (exposureMask) {
+          exposureMask.style.backgroundColor = 'black';
+          exposureMask.style.opacity = blackClip;
+        }
+      } else {
+        if (exposureMask) exposureMask.style.opacity = '0';
+      }
+
+      // 2. 【被写界深度（ボケ）の物理シミュレーション】
+      // F値が小さい（f/1.4）ほど美しく全体が柔らかくボケ、f/8付近が最もシャープになります。
+      let lensBlur = 0;
+      if (fStop < 8.0) {
+        lensBlur = Math.pow((8.0 - fStop), 1.6) * 0.45;
+      }
+
+      // 3. 【回折ボケ（小絞りボケ）の物理シミュレーション】
+      // F値を絞りすぎると（F16〜F22）、光の波動性質（回折）により逆に全体がぼやけます。高画素（100MP）なほど早いF値で限界に達します。
+      let diffractionBlur = 0;
+      const criticalF = res.pitch * 3.0; // 物理回折限界
+      if (fStop > criticalF) {
+        diffractionBlur = (fStop - criticalF) * 0.2 * (100 / res.scale);
+      }
+
+      // 4. 【高感度ノイズ（画素ピッチ連動）】
+      // 画素数が大きい（100MP）＝画素ピッチ（受光面積）が狭いため、高ISO時のカラーノイズが激しく増大します。
+      if (iso >= 400) {
+        const pitchRatio = 4.2 / res.pitch; // 24MPを標準1とした時のノイズ増幅率
+        const noiseIntensity = Math.min(0.95, (Math.log2(iso) - 7.5) * 0.12 * pitchRatio);
+        
+        if (noiseIntensity > 0.01) {
+          if (noiseLayer) {
+            noiseLayer.style.opacity = noiseIntensity;
+            if (iso >= 3200 && res.mp >= 24) {
+              noiseLayer.style.filter = "url(#chroma-grain)"; // 高画素用のカラー偽色
+            } else {
+              noiseLayer.style.filter = "url(#sensor-grain)";  // 一般的な輝度ノイズ
+            }
+          }
+        } else {
+          if (noiseLayer) noiseLayer.style.opacity = 0;
+        }
+      } else {
+        if (noiseLayer) noiseLayer.style.opacity = 0;
+      }
+
+      // 5. 【低解像度化（ピクセルモザイク調表示）】
+      // 画面の大きさは崩さず、像の中身のみを綺麗にドット化
+      if (sensorContainer) {
+        if (res.scale < 100) {
+          sensorContainer.style.width = `${res.scale}%`;
+          sensorContainer.style.height = `${res.scale}%`;
+          sensorContainer.classList.add('pixelated');
+        } else {
+          sensorContainer.style.width = '100%';
+          sensorContainer.style.height = '100%';
+          sensorContainer.classList.remove('pixelated');
+        }
+      }
+
+      // 6. 【手ブレ（SS×画素数物理）】
+      // 高画素なほど等倍での手ブレを拾いやすくなります。
+      const safeSS = 0.008; // 1/125sを安全限界とする
+      let shakeBlur = 0;
+      if (cameraMount === 'handheld' && ss.val > safeSS) {
+        const pitchSensitivity = 4.2 / res.pitch;
+        shakeBlur = (ss.val - safeSS) * 32 * pitchSensitivity;
+      }
+
+      // 7. フィルター一括適用（ボケ、手ブレ、回折ボケ、明るさ）
+      const totalBlur = lensBlur + diffractionBlur + shakeBlur;
+      if (imgElement) {
+        imgElement.style.filter = `brightness(${cssBrightness}) blur(${totalBlur}px)`;
+      }
+
+      // 8. 診断情報の生成
+      generateDiagnostics(fStop, ss, fps, iso, res, evDiff, shakeBlur, criticalF);
+    }
+
+    // ----------------- 光学診断 ＆ アドバイス生成器 -----------------
+    function generateDiagnostics(f, ss, fps, iso, res, ev, shake, criticalF) {
+      if (!diagnosticsPanel) return;
+      diagnosticsPanel.innerHTML = "";
+      const logs = [];
+
+      // A. 露出
+      if (ev > 1.8) {
+        logs.push({
+          status: 'error',
+          icon: '☀️',
+          title: '白飛び（露出過多）が発生しています',
+          desc: `取り込む光量が多すぎ、写真全体が白く飛んで情報が失われています。F値を大きくして「絞る」か、シャッタースピードを速めて露出を下げてください。`
+        });
+      } else if (ev < -1.8) {
+        logs.push({
+          status: 'error',
+          icon: '🌑',
+          title: '黒潰れ（露出不足）が発生しています',
+          desc: `センサーに光が届いていません。F値を下げて「絞りを開く」か、シャッタースピードを遅くするか、ISO感度を適切に上げてください。`
+        });
+      } else {
+        logs.push({
+          status: 'success',
+          icon: '✅',
+          title: '適正露出 (良好)',
+          desc: `露出の調和が完璧です。写真の明るさが最も美しく、ハイライトから影のディテールまでクリアに描かれます。`
+        });
+      }
+
+      // B. 被写界深度
+      if (f <= 2.0) {
+        logs.push({
+          status: 'info',
+          icon: '🌸',
+          title: '大口径・浅い被写界深度',
+          desc: `f/${f}という非常に明るい設定です。ピントの合う面が極めて薄くなり、全体にふんわりとしたカメラ本来の美しいボケ感が生まれます。`
+        });
+      }
+
+      // C. 回折
+      if (f > criticalF) {
+        logs.push({
+          status: 'warning',
+          icon: '🔬',
+          title: '小絞りボケ（回折限界オーバー）',
+          desc: `現在の画素ピッチにおける光学限界値（f/${criticalF.toFixed(1)}）を超えて絞り込まれています。光が極狭の絞り穴で回り込むため、シャープさが低下して全体が眠い画質になります。`
+        });
+      }
+
+      // D. 画素数と手ブレのシビアさ
+      if (shake > 0) {
+        logs.push({
+          status: 'error',
+          icon: '👋',
+          title: `${res.mp}MPの高画素センサーで「手ブレ」を検知`,
+          desc: `シャッタースピード（${ss.text}）が手持ち限界（1/125秒）より遅いため、手持ちの微かな揺れがブレとして写真に残ってしまっています。高画素（ピッチ:${res.pitch}μm）なほどブレに敏感になります。「三脚固定」に変更してください。`
+        });
+      }
+
+      // E. 高感度ノイズと画素ピッチのトレードオフ
+      if (res.mp >= 50 && iso >= 1600) {
+        logs.push({
+          status: 'warning',
+          icon: '🍿',
+          title: `超高画素（${res.mp}MP）特有の高感度カラーノイズ`,
+          desc: `画素ピッチが非常に微細（${res.pitch}μm）なため、1画素あたりに入る光の量が少なくなっています。ISO ${iso}の電子増幅による砂嵐のようなカラーノイズが発生しやすい状態です。`
+        });
+      } else if (res.mp <= 12 && iso >= 6400) {
+        logs.push({
+          status: 'info',
+          icon: '🛡️',
+          title: `低画素大ピッチによる圧倒的「高感度ノイズ耐性」`,
+          desc: `画素数は${res.mp}MPと控えめですが、1画素あたりの面積（${res.pitch}μm）が非常に広いため、ISO ${iso}という超高感度でもノイズが発生しにくく、非常にクリアな描写を維持しています。`
+        });
+      }
+
+      // 180度ルール
+      const recSS = 1 / (2 * fps);
+      if (ss.val < recSS * 0.4) {
+        logs.push({
+          status: 'warning',
+          icon: '🎬',
+          title: '映画的シャッター角度（180度ルール）からの逸脱',
+          desc: `${fps} FPSの動画撮影に対して、シャッタースピードが速すぎます。動きに対する自然な残像感（被写体ブレ）が消え、パラパラ漫画のようにカクついた不自然な映像ルックになります。`
+        });
+      }
+
+      // 出力
+      logs.forEach(log => {
+        let borderClass = "border-l-4 border-slate-700 bg-slate-800 text-slate-300";
+        if (log.status === 'error') borderClass = "border-l-4 border-rose-500 bg-rose-950/20 text-rose-200";
+        if (log.status === 'warning') borderClass = "border-l-4 border-amber-500 bg-amber-950/20 text-amber-200";
+        if (log.status === 'info') borderClass = "border-l-4 border-sky-500 bg-sky-950/20 text-sky-200";
+        if (log.status === 'success') borderClass = "border-l-4 border-emerald-500 bg-emerald-950/20 text-emerald-200";
+
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-r-lg flex items-start gap-3 border border-slate-800 ${borderClass}`;
+        div.innerHTML = `
+          <span class="text-base">${log.icon}</span>
+          <div>
+            <h4 class="font-bold text-[11px]">${log.title}</h4>
+            <p class="text-[10px] mt-0.5 leading-relaxed opacity-90">${log.desc}</p>
+          </div>
+        `;
+        diagnosticsPanel.appendChild(div);
+      });
+    }
+
+    // ----------------- 手ブレ（リアルタイム有機的振動） -----------------
+    function animateViewfinder() {
+      if (isShakeActive) {
+        timeX += 0.15;
+        const ss = SS_VALUES[parseInt(rngSs.value)];
+        let shakeAmplitude = 0;
+        
+        if (cameraMount === 'handheld') {
+          shakeAmplitude = Math.max(0.6, ss.val * 35);
+        }
+
+        const jitterX = (Math.sin(timeX * 0.75) * 0.8 + Math.cos(timeX * 2.0) * 0.2) * shakeAmplitude;
+        const jitterY = (Math.cos(timeX * 0.85) * 0.7 + Math.sin(timeX * 1.7) * 0.3) * shakeAmplitude;
+
+        if (lensMount) {
+          lensMount.style.transform = `translate(${jitterX}px, ${jitterY}px) scale(1.02)`;
+
+          // シャッター速度の遅さによるモーションブラーのブレをファインダーに直接連動
+          const safeSS = 0.008;
+          if (cameraMount === 'handheld' && ss.val > safeSS) {
+            const motionBlurFactor = (ss.val - safeSS) * 15;
+            imgElement.style.filter = imgElement.style.filter + ` blur(${motionBlurFactor}px)`;
+          }
+        }
+
+        // ノイズ粒子の高速スクロール更新
+        if (noiseLayer) {
+          const noiseX = Math.floor(Math.random() * 100);
+          const noiseY = Math.floor(Math.random() * 100);
+          noiseLayer.style.backgroundPosition = `${noiseX}px ${noiseY}px`;
+        }
+      } else {
+        if (lensMount) lensMount.style.transform = 'none';
+      }
+
+      requestAnimationFrame(animateViewfinder);
+    }
+
+    // 初期化起動
+    updateSimulation();
+    animateViewfinder();
+
+  </script>
+</body>
+</html>

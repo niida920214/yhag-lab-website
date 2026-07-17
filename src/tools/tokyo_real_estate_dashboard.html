@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOKYO REAL ESTATE — 不動産市場データベース</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#04070e;
+    --panel:rgba(8,14,26,0.82);
+    --panel-border:rgba(90,160,255,0.22);
+    --ink:#cfe3ff;
+    --ink-dim:#6b84a8;
+    --accent:#4da3ff;
+    --hot:#ff5a4d;
+    --mono:'Courier New',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;color:var(--ink)}
+  #scene{position:fixed;inset:0;cursor:grab}
+  #scene:active{cursor:grabbing}
+  #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  .geo-label{position:absolute;transform:translate(-50%,-50%);font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:rgba(180,210,255,.85);text-shadow:0 0 8px rgba(77,163,255,.6),0 1px 2px #000;white-space:nowrap;font-weight:bold}
+  .geo-label small{display:block;text-align:center;font-size:8px;letter-spacing:.18em;color:var(--ink-dim);font-weight:normal}
+
+  .panel{position:fixed;background:var(--panel);border:1px solid var(--panel-border);border-radius:6px;backdrop-filter:blur(10px);box-shadow:0 0 24px rgba(0,10,30,.6),inset 0 0 30px rgba(50,120,255,.04)}
+
+  /* header title */
+  #main-title{position:fixed;top:18px;left:340px;pointer-events:none}
+  #main-title h1{font-family:var(--mono);font-size:20px;letter-spacing:.42em;color:#e8f2ff;text-shadow:0 0 14px rgba(77,163,255,.8)}
+  #main-title p{font-size:10px;letter-spacing:.3em;color:var(--ink-dim);margin-top:4px}
+
+  /* left control panel */
+  #ctrl{top:16px;left:16px;width:300px;padding:16px 18px;max-height:calc(100vh - 120px);overflow-y:auto}
+  #ctrl h2{font-size:13px;letter-spacing:.14em;padding-bottom:10px;border-bottom:1px solid var(--panel-border);margin-bottom:14px;color:#e8f2ff}
+  #ctrl h2::before{content:"▮";color:var(--accent);margin-right:8px}
+  .field{margin-bottom:16px}
+  .field label{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-dim);letter-spacing:.08em;margin-bottom:6px}
+  .field label b{color:var(--ink);font-family:var(--mono);font-weight:normal}
+  select{width:100%;background:rgba(20,32,54,.9);border:1px solid var(--panel-border);color:var(--ink);padding:7px 8px;font-size:12px;border-radius:4px;outline:none;font-family:inherit}
+  input[type=range]{width:100%;-webkit-appearance:none;height:3px;background:linear-gradient(90deg,#1c3a66,#4da3ff);border-radius:2px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#dceaff;border:2px solid var(--accent);box-shadow:0 0 8px rgba(77,163,255,.9);cursor:pointer}
+  input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid #fff}
+  .toggles{display:flex;gap:8px;margin-top:4px}
+  .tgl{flex:1;font-size:11px;letter-spacing:.06em;padding:7px 0;text-align:center;border:1px solid var(--panel-border);border-radius:4px;color:var(--ink-dim);cursor:pointer;user-select:none;transition:.15s;background:transparent;font-family:inherit}
+  .tgl.on{color:#eaf4ff;border-color:var(--accent);background:rgba(77,163,255,.14);box-shadow:0 0 10px rgba(77,163,255,.25) inset}
+  .legend{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--ink-dim);margin-top:6px}
+  .legend .grad{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#2255ff,#22c8ff,#ffd24d,#ff5a4d)}
+
+  /* top right stats */
+  #stats{top:16px;right:16px;width:230px;padding:14px 16px}
+  #stats h3{font-size:12px;letter-spacing:.12em;color:#e8f2ff;margin-bottom:10px}
+  #stats h3::before{content:"◈";color:var(--accent);margin-right:7px}
+  .stat{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-top:1px dashed rgba(90,160,255,.14)}
+  .stat span{color:var(--ink-dim)}
+  .stat b{font-family:var(--mono);color:#ffe9d6;font-weight:normal;text-shadow:0 0 8px rgba(255,120,80,.4)}
+  .stat b.cool{color:#d6ecff;text-shadow:0 0 8px rgba(77,163,255,.4)}
+
+  /* bottom panel */
+  #timeline{bottom:16px;left:50%;transform:translateX(-50%);width:min(760px,calc(100vw - 40px));padding:12px 20px;display:flex;align-items:center;gap:18px}
+  #timeline .clock{font-family:var(--mono);font-size:11px;color:var(--ink-dim);white-space:nowrap}
+  #timeline .clock b{color:var(--ink);font-weight:normal}
+  #timeline .track{flex:1}
+  #timeline .years{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--ink-dim);margin-top:4px}
+  #timeline .year-now{font-family:var(--mono);font-size:16px;color:#eaf4ff;text-shadow:0 0 10px rgba(77,163,255,.8);min-width:52px;text-align:center}
+  #timeline .avg{font-family:var(--mono);font-size:11px;color:var(--ink-dim);white-space:nowrap;text-align:right}
+  #timeline .avg b{display:block;font-size:15px;color:#ffe9d6;font-weight:normal;text-shadow:0 0 10px rgba(255,140,90,.5)}
+
+  #hint{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.15em;color:rgba(120,150,190,.55);pointer-events:none}
+
+  @media (max-width:900px){
+    #ctrl{width:250px}
+    #main-title{left:16px;top:auto;bottom:100px}
+    #stats{width:190px}
+  }
+  @media (prefers-reduced-motion: reduce){ .tgl{transition:none} }
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="labels"></div>
+
+<div id="main-title">
+  <h1>TOKYO REAL ESTATE</h1>
+  <p>METROPOLITAN PRICE FIELD — 東京・神奈川東部</p>
+</div>
+
+<div class="panel" id="ctrl">
+  <h2>不動産市場データベース</h2>
+
+  <div class="field">
+    <label>表示データ</label>
+    <select id="mode">
+      <option value="rent">賃貸 家賃 (㎡)</option>
+      <option value="price">物件価格</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>駅からの距離 <b id="distV">〜30分</b></label>
+    <input type="range" id="dist" min="1" max="30" value="30">
+  </div>
+
+  <div class="field">
+    <label>築年数 <b id="ageV">〜50年+</b></label>
+    <input type="range" id="age" min="0" max="50" value="50">
+  </div>
+
+  <div class="field">
+    <label>価格範囲 <b id="priceV">1,000万円 〜 2億円</b></label>
+    <input type="range" id="pmax" min="1000" max="20000" value="20000" step="250">
+  </div>
+
+  <div class="field">
+    <label>表示レイヤー</label>
+    <div class="toggles">
+      <button class="tgl on" id="tglHist">ヒストグラム</button>
+      <button class="tgl on" id="tglBldg">建物表示</button>
+    </div>
+    <div class="legend"><span>低</span><div class="grad"></div><span>高</span></div>
+  </div>
+</div>
+
+<div class="panel" id="stats">
+  <h3>不動産統計情報</h3>
+  <div class="stat"><span>最高家賃</span><b>120万円</b></div>
+  <div class="stat"><span>最高物件価格</span><b>5.5億円</b></div>
+  <div class="stat"><span>表示物件数</span><b class="cool" id="stCount">—</b></div>
+  <div class="stat"><span>最高値エリア</span><b class="cool" id="stTop">MINATO</b></div>
+</div>
+
+<div class="panel" id="timeline">
+  <div class="clock">更新時刻: <b>15:30</b></div>
+  <div class="track">
+    <input type="range" id="year" min="2015" max="2024" value="2024" step="1" style="width:100%">
+    <div class="years"><span>2015</span><span>2017</span><span>2019</span><span>2021</span><span>2023</span></div>
+  </div>
+  <div class="year-now" id="yearNow">2024</div>
+  <div class="avg">平均単価<b id="avgV">98,000円/㎡</b></div>
+</div>
+<div id="hint">DRAG: 回転 · WHEEL: ズーム · SHIFT+DRAG: 移動</div>
+
+<script>
+// ---------- data model ----------
+// Districts: [name, jp, x, z, price level 0..1, density, spread]
+const DISTRICTS = [
+  ["MINATO","港区",           14,-6, 1.00, 90, 7],
+  ["CHIYODA","千代田区",      12,-12,0.95, 60, 6],
+  ["CHUO","中央区",           18,-10,0.92, 70, 6],
+  ["SHIBUYA","渋谷区",         4, 0, 0.90, 85, 7],
+  ["SHINJUKU","新宿区",        4,-10,0.85, 95, 8],
+  ["MEGURO","目黒区",          4, 8, 0.78, 60, 6],
+  ["BUNKYO","文京区",         10,-18,0.72, 55, 6],
+  ["SHINAGAWA","品川区",      12, 10, 0.70, 75, 8],
+  ["SETAGAYA","世田谷区",     -6, 8, 0.62, 95, 10],
+  ["NAKANO","中野区",         -4,-8, 0.58, 60, 6],
+  ["SUGINAMI","杉並区",      -12,-4, 0.55, 70, 8],
+  ["TOSHIMA","豊島区",         2,-18,0.60, 60, 6],
+  ["OTA","大田区",             8, 20, 0.55, 85, 10],
+  ["KOTO","江東区",           24,-4, 0.58, 70, 8],
+  ["NERIMA","練馬区",        -12,-14,0.45, 70, 9],
+  ["ITABASHI","板橋区",       -4,-22,0.42, 60, 8],
+  ["ADACHI","足立区",         14,-26,0.32, 60, 9],
+  ["EDOGAWA","江戸川区",      30,-10,0.38, 60, 8],
+  ["KAWASAKI","川崎市",       -2, 24, 0.52, 80, 11],
+  ["MUSASHI-KOSUGI","武蔵小杉",-8, 20, 0.66, 45, 5],
+  ["YOKOHAMA","横浜市北部",  -14, 30, 0.48, 90, 12],
+  ["SHIN-YOKOHAMA","新横浜", -22, 26, 0.44, 45, 6],
+];
+const TAMA_RIVER = t => ({x:-30+t*58, z:14+Math.sin(t*3.1)*3+t*10}); // Tokyo/Kanagawa border
+
+function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry(20260715);
+
+// generate buildings
+const B = [];
+DISTRICTS.forEach((d,di)=>{
+  const [,,cx,cz,lvl,count,spread]=d;
+  for(let i=0;i<count;i++){
+    const a=rnd()*Math.PI*2, r=Math.pow(rnd(),.6)*spread;
+    const x=cx+Math.cos(a)*r, z=cz+Math.sin(a)*r*.8;
+    const centrality=1-Math.min(1,r/spread);
+    const h = 1.2 + Math.pow(rnd(),2.2)*(4+lvl*26)*(0.5+centrality*.9); // building height
+    const dist = 1+Math.floor(rnd()*29);            // min from station
+    const age  = Math.floor(Math.pow(rnd(),1.2)*50); // years
+    // base price signal (10^3 man-yen): location + centrality + newness + station proximity + noise
+    let p = lvl*(0.55+centrality*.45) * (1.15-age/120) * (1.2-dist/60) * (0.7+rnd()*.7);
+    B.push({x,z,h,dist,age,p,di});
+  }
+});
+const N=B.length;
+
+// ---------- three.js scene ----------
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x04070e);
+scene.fog=new THREE.FogExp2(0x04070e,0.0075);
+
+const camera=new THREE.PerspectiveCamera(46,1,1,600);
+let camTheta=-.55, camPhi=.98, camDist=86, target=new THREE.Vector3(2,0,4);
+function updateCam(){
+  camera.position.set(
+    target.x+camDist*Math.sin(camPhi)*Math.sin(camTheta),
+    target.y+camDist*Math.cos(camPhi),
+    target.z+camDist*Math.sin(camPhi)*Math.cos(camTheta));
+  camera.lookAt(target);
+}
+
+// ground grid
+const grid=new THREE.GridHelper(240,120,0x14304f,0x0a1a30);
+grid.material.transparent=true;grid.material.opacity=.5;
+scene.add(grid);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),
+  new THREE.MeshBasicMaterial({color:0x050b16}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-.05;scene.add(ground);
+
+// Tama river (border)
+(function(){
+  const pts=[];for(let i=0;i<=40;i++){const p=TAMA_RIVER(i/40);pts.push(new THREE.Vector3(p.x,.05,p.z));}
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x1e5f8f,transparent:true,opacity:.9})));
+  const pts2=pts.map(v=>new THREE.Vector3(v.x,.05,v.z+1.6));
+  const g2=new THREE.BufferGeometry().setFromPoints(pts2);
+  scene.add(new THREE.Line(g2,new THREE.LineBasicMaterial({color:0x123a5c,transparent:true,opacity:.7})));
+})();
+
+scene.add(new THREE.AmbientLight(0x2a3c5c,1.4));
+const key=new THREE.DirectionalLight(0x6f9fdc,.5);key.position.set(30,60,-20);scene.add(key);
+
+// instanced meshes
+const bGeo=new THREE.BoxGeometry(1,1,1);bGeo.translate(0,.5,0);
+const bldgMat=new THREE.MeshPhysicalMaterial({
+  color:0x9fc4e8,metalness:0,roughness:.15,transmission:0,
+  transparent:true,opacity:.16,depthWrite:false,
+  emissive:0x1a3a5f,emissiveIntensity:.55});
+const bldgMesh=new THREE.InstancedMesh(bGeo,bldgMat,N);
+const edgeMat=new THREE.MeshBasicMaterial({color:0x69a8e6,transparent:true,opacity:.10,wireframe:true,depthWrite:false});
+const wireMesh=new THREE.InstancedMesh(bGeo,edgeMat,N);
+
+const barGeo=new THREE.BoxGeometry(.45,1,.45);barGeo.translate(0,.5,0);
+const barMat=new THREE.MeshBasicMaterial({transparent:true,opacity:.92,toneMapped:false});
+const barMesh=new THREE.InstancedMesh(barGeo,barMat,N);
+const glowGeo=new THREE.BoxGeometry(.9,1,.9);glowGeo.translate(0,.5,0);
+const glowMat=new THREE.MeshBasicMaterial({transparent:true,opacity:.14,toneMapped:false,depthWrite:false,blending:THREE.AdditiveBlending});
+const glowMesh=new THREE.InstancedMesh(glowGeo,glowMat,N);
+scene.add(barMesh,glowMesh,bldgMesh,wireMesh);
+
+const M=new THREE.Matrix4(),C=new THREE.Color(),ZERO=new THREE.Matrix4().makeScale(0,0,0);
+
+function priceColor(t){ // blue → cyan → amber → red
+  t=Math.max(0,Math.min(1,t));
+  if(t<.4)  C.setHSL(.62-.12*(t/.4),.95,.55);
+  else if(t<.75) C.setHSL(.50-.37*((t-.4)/.35),.95,.55);
+  else C.setHSL(.13-.13*((t-.75)/.25),.95,.55+.06*((t-.75)/.25));
+  return C;
+}
+
+// ---------- state & rebuild ----------
+const S={mode:'rent',dist:30,age:50,pmax:20000,hist:true,bldg:true,year:2024};
+
+function yearFactor(y){const t=(y-2015)/9;return .68+.32*Math.pow(t,1.35)+(y>=2021?(y-2020)*.015:0);}
+
+function rebuild(){
+  const yf=yearFactor(S.year);
+  let shown=0,sum=0,best=-1,bestP=0;
+  const distSum=new Array(DISTRICTS.length).fill(0),distN=new Array(DISTRICTS.length).fill(0);
+  for(let i=0;i<N;i++){
+    const b=B[i];
+    const p=b.p*yf;                       // 0..~1.1 normalized signal
+    const priceMan=1000+p*19000;          // 1,000万〜2億
+    const visible=b.dist<=S.dist && b.age<=S.age && priceMan<=S.pmax;
+    // building
+    if(S.bldg&&visible){M.makeTranslation(b.x,0,b.z);M.scale(new THREE.Vector3(1.15,b.h,1.15));bldgMesh.setMatrixAt(i,M);wireMesh.setMatrixAt(i,M);}
+    else{bldgMesh.setMatrixAt(i,ZERO);wireMesh.setMatrixAt(i,ZERO);}
+    // bar
+    if(S.hist&&visible){
+      const t=S.mode==='rent'?Math.pow(p,.9):Math.pow(p,1.1);
+      const barH=1+t*42;
+      M.makeTranslation(b.x,0,b.z);M.scale(new THREE.Vector3(1,barH,1));
+      barMesh.setMatrixAt(i,M);glowMesh.setMatrixAt(i,M);
+      const col=priceColor(t);barMesh.setColorAt(i,col);glowMesh.setColorAt(i,col);
+    } else {barMesh.setMatrixAt(i,ZERO);glowMesh.setMatrixAt(i,ZERO);}
+    if(visible){shown++;sum+=p;distSum[b.di]+=p;distN[b.di]++;}
+  }
+  for(let d=0;d<DISTRICTS.length;d++){if(distN[d]&&distSum[d]/distN[d]>bestP){bestP=distSum[d]/distN[d];best=d;}}
+  [bldgMesh,wireMesh,barMesh,glowMesh].forEach(m=>{m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;});
+  // stats
+  document.getElementById('stCount').textContent=shown.toLocaleString()+" 件";
+  document.getElementById('stTop').textContent=best>=0?DISTRICTS[best][0]:"—";
+  const avg=shown?sum/shown:0;
+  document.getElementById('avgV').textContent=S.mode==='rent'
+    ? Math.round(3200+avg*146000).toLocaleString()+"円/㎡"
+    : (Math.round((1000+avg*19000)/100)/100).toFixed(2)+"億円";
+}
+
+// ---------- UI wiring ----------
+const $=id=>document.getElementById(id);
+$('mode').onchange=e=>{S.mode=e.target.value;rebuild();};
+$('dist').oninput=e=>{S.dist=+e.target.value;$('distV').textContent="〜"+S.dist+"分";rebuild();};
+$('age').oninput=e=>{S.age=+e.target.value;$('ageV').textContent=S.age>=50?"〜50年+":"〜"+S.age+"年";rebuild();};
+$('pmax').oninput=e=>{S.pmax=+e.target.value;
+  $('priceV').textContent="1,000万円 〜 "+(S.pmax>=10000?(S.pmax/10000)+"億円":S.pmax.toLocaleString()+"万円");rebuild();};
+$('year').oninput=e=>{S.year=+e.target.value;$('yearNow').textContent=S.year;rebuild();};
+$('tglHist').onclick=e=>{S.hist=!S.hist;e.target.classList.toggle('on',S.hist);rebuild();};
+$('tglBldg').onclick=e=>{S.bldg=!S.bldg;e.target.classList.toggle('on',S.bldg);rebuild();};
+
+// ---------- labels ----------
+const labelWrap=document.getElementById('labels');
+const LABELED=["MINATO","SHINJUKU","SHIBUYA","SUGINAMI","SETAGAYA","OTA","KOTO","ADACHI","KAWASAKI","MUSASHI-KOSUGI","YOKOHAMA","SHINAGAWA","NERIMA"];
+const labelEls=DISTRICTS.filter(d=>LABELED.includes(d[0])).map(d=>{
+  const el=document.createElement('div');el.className='geo-label';
+  el.innerHTML=d[0]+"<small>"+d[1]+"</small>";labelWrap.appendChild(el);
+  return{el,pos:new THREE.Vector3(d[2],2,d[3])};
+});
+const V=new THREE.Vector3();
+function drawLabels(){
+  const w=innerWidth,h=innerHeight;
+  labelEls.forEach(L=>{
+    V.copy(L.pos).project(camera);
+    if(V.z<1){L.el.style.display='block';L.el.style.left=(V.x*.5+.5)*w+'px';L.el.style.top=(-V.y*.5+.5)*h+'px';}
+    else L.el.style.display='none';
+  });
+}
+
+// ---------- interaction ----------
+let drag=null;
+canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,shift:e.shiftKey};canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+  if(drag.shift||e.buttons===4){
+    const s=camDist*.0016;
+    const fx=Math.sin(camTheta),fz=Math.cos(camTheta);
+    target.x-=(dx*fz*-1+dy*fx)*s; target.z-=(dx*fx+dy*fz)*s*-1;
+    target.x-= (Math.cos(camTheta)*dx)*s*0; // keep simple
+  } else {
+    camTheta-=dx*.005;camPhi=Math.max(.25,Math.min(1.35,camPhi-dy*.004));
+  }
+  updateCam();
+});
+canvas.addEventListener('pointerup',()=>drag=null);
+canvas.addEventListener('wheel',e=>{e.preventDefault();camDist=Math.max(25,Math.min(220,camDist*(1+e.deltaY*.001)));updateCam();},{passive:false});
+
+function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);
+
+// slow ambient drift
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop(t){
+  if(!drag&&!reduced)camTheta+=.00016;
+  updateCam();drawLabels();
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+resize();updateCam();rebuild();requestAnimationFrame(loop);
+</script>
+</body>
+</html>

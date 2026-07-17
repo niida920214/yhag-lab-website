@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKET SENTIMENT EQ — 2D フラット・センチメント・ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#fafbfd;
+    --panel:#ffffffee;
+    --ink:#14161c;
+    --soft:#e4e8f0;
+    --dim:#6b7280;
+    --buy:#0653e6;
+    --sell:#e8304f;
+    --accent:#f59e0b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg)}
+  body{font-family:'Noto Sans JP',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+  #scene{position:fixed;inset:0;cursor:default}
+  .en{font-family:'Rajdhani',sans-serif;letter-spacing:.14em}
+
+  /* ---------- overlay layer ---------- */
+  #overlay{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+
+  /* ---------- ⚠ 大口注文シグナル ---------- */
+  .warnWrap{position:absolute;left:0;top:0;will-change:transform,opacity;z-index:5}
+  .warn{
+    display:inline-flex;align-items:center;gap:5px;
+    background:#fff;border:2px solid var(--ink);border-radius:9px;
+    padding:3px 9px;font-size:11px;font-weight:900;color:var(--ink);
+    box-shadow:3px 3px 0 var(--ink);
+    transition:opacity .35s;
+  }
+  .warn .ic{font-size:13px;line-height:1}
+  .warn.pop{animation:popIn .5s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes popIn{
+    0%{transform:scale(0) translateY(10px)}
+    60%{transform:scale(1.25) translateY(-3px)}
+    80%{transform:scale(.92)}
+    100%{transform:scale(1)}
+  }
+
+  /* ---------- 速報ニュース通知（NEWS FLASH） ---------- */
+  #news{
+    position:fixed;top:96px;right:20px;z-index:20;width:284px;
+    display:flex;flex-direction:column;gap:10px;pointer-events:none;
+  }
+  .newsCard{
+    background:#fff;border:2px solid var(--ink);border-radius:12px;
+    box-shadow:4px 4px 0 var(--ink);
+    padding:9px 12px 10px;
+    transform:translateX(135%);opacity:1;
+    transition:transform .55s cubic-bezier(.34,1.56,.64,1),opacity .4s;
+  }
+  .newsCard.in{transform:translateX(0)}
+  .newsCard.out{transform:translateX(135%);opacity:0}
+  .newsHead{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .newsBadge{
+    font-family:'Rajdhani',sans-serif;font-weight:700;font-size:9px;letter-spacing:.18em;
+    padding:2px 7px;border-radius:6px;border:1.5px solid var(--ink);color:#fff;
+  }
+  .newsBadge.high{background:var(--sell)}
+  .newsBadge.medium{background:var(--accent)}
+  .newsTime{font-family:'Rajdhani',sans-serif;font-size:10px;letter-spacing:.1em;color:var(--dim);font-weight:600}
+  .newsTxt{font-size:11px;line-height:1.55;font-weight:600}
+  @media (max-width:820px){ #news{width:230px;top:80px} }
+
+  /* ---------- header ---------- */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:10;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:20px 26px 0;pointer-events:none;
+  }
+  h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:26px;letter-spacing:.32em;color:var(--ink);line-height:1}
+  h1 b{color:var(--buy)}
+  .sub{margin-top:6px;font-size:11px;color:var(--dim);letter-spacing:.18em}
+  .extremes{text-align:right;font-family:'Rajdhani',sans-serif;font-size:12px;letter-spacing:.12em}
+  .extremes div{margin-bottom:4px;color:var(--dim)}
+  .extremes b{font-size:13px}
+  .extremes .hi b{color:var(--buy)}
+  .extremes .lo b{color:var(--sell)}
+  .extremes span{color:var(--ink);font-family:'Noto Sans JP',sans-serif;letter-spacing:0;font-weight:600}
+
+  /* ---------- left panel ---------- */
+  #panel{
+    position:fixed;top:64px;left:20px;z-index:10;width:242px;
+    background:var(--panel);backdrop-filter:blur(10px);
+    border:2px solid var(--ink);border-radius:14px;
+    box-shadow:5px 5px 0 #14161c22;
+    padding:12px 0 10px;max-height:calc(100vh - 170px);
+    display:flex;flex-direction:column;
+  }
+  #panel .cap{font-family:'Rajdhani',sans-serif;font-size:10px;letter-spacing:.28em;color:var(--dim);padding:8px 16px 6px}
+  #sectors{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#c6cddd transparent}
+  .row{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;user-select:none;transition:background .15s,opacity .2s}
+  .row:hover{background:#14161c0a}
+  .row .dot{width:12px;height:12px;border-radius:4px;flex:none;background:currentColor;border:2px solid var(--ink)}
+  .row .nm{font-size:13px;font-weight:600;flex:1}
+  .row .val{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;letter-spacing:.06em}
+  .row.storm .nm::after{content:'⚡';margin-left:5px;font-size:10px}
+  .row.off{opacity:.3}
+  .row.off .dot{background:#d3d9e5}
+
+  .ctl{padding:6px 16px 4px;border-top:1px solid #e6e9f1;margin-top:6px}
+  .ctl label{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:6px}
+  .ctl label b{color:var(--ink);font-family:'Rajdhani',sans-serif;letter-spacing:.08em}
+  input[type=range]{width:100%;appearance:none;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--sell),#c9cede,var(--buy));outline:none}
+  input[type=range]::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid var(--ink);cursor:pointer}
+  .switchrow{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;font-size:12px;font-weight:500}
+  .sw{width:34px;height:19px;border-radius:10px;background:#e2e6ef;border:2px solid var(--ink);position:relative;cursor:pointer;transition:background .2s;flex:none}
+  .sw::after{content:'';position:absolute;top:1px;left:1px;width:13px;height:13px;border-radius:50%;background:var(--ink);transition:.2s}
+  .sw.on{background:var(--buy)}
+  .sw.on::after{left:16px;background:#fff}
+  .note{font-size:10px;line-height:1.7;color:var(--dim);padding:8px 16px 2px;border-top:1px solid #e6e9f1;margin-top:6px}
+  .note code{color:var(--buy);font-size:10px;font-weight:700}
+  .note .op{color:#8a93a6}
+  .note .warn-hint{color:var(--ink);font-weight:700}
+
+  /* ---------- bottom bar ---------- */
+  #bar{
+    position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10;
+    display:flex;align-items:center;gap:22px;
+    background:var(--panel);backdrop-filter:blur(10px);
+    border:2px solid var(--ink);border-radius:16px;
+    box-shadow:5px 5px 0 #14161c22;
+    padding:12px 24px;white-space:nowrap;
+  }
+  #playBtn{
+    width:38px;height:38px;border-radius:50%;border:2px solid var(--ink);background:#fff;
+    color:var(--ink);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:.15s;
+  }
+  #playBtn:hover{background:var(--ink);color:#fff}
+  .clockbox{text-align:center}
+  #clock{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:26px;letter-spacing:.1em;color:var(--ink);line-height:1}
+  .clockbox small{font-size:10px;color:var(--buy);letter-spacing:.2em;font-weight:700}
+  .speeds{display:flex;gap:6px}
+  .spd{font-family:'Rajdhani',sans-serif;font-size:11px;letter-spacing:.08em;padding:5px 10px;border-radius:7px;border:2px solid transparent;color:var(--dim);background:transparent;cursor:pointer;transition:.15s;font-weight:700}
+  .spd:hover{color:var(--ink)}
+  .spd.on{background:#fff;border-color:var(--ink);color:var(--ink)}
+  .gauge{text-align:center}
+  #mood{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:24px;letter-spacing:.06em;color:var(--ink);line-height:1}
+  .gauge small{font-size:10px;color:var(--dim);letter-spacing:.2em}
+
+  /* ---------- detail card ---------- */
+  #card{
+    position:fixed;right:26px;bottom:26px;z-index:10;width:238px;
+    background:var(--panel);backdrop-filter:blur(10px);
+    border:2px solid var(--ink);border-radius:14px;
+    box-shadow:5px 5px 0 #14161c22;
+    padding:14px 16px;display:none;
+  }
+  #card.show{display:block;animation:pop .18s ease-out}
+  @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  #card .code{font-family:'Rajdhani',sans-serif;font-size:11px;letter-spacing:.22em;color:var(--dim);font-weight:700}
+  #card .name{font-size:16px;font-weight:900;margin:2px 0 10px}
+  #card .kv{display:flex;justify-content:space-between;font-size:12px;margin:5px 0}
+  #card .kv span{color:var(--dim)}
+  #card .kv b{font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:.06em}
+  #sBar{height:6px;border-radius:3px;background:#eef0f6;border:1.5px solid var(--ink);margin-top:10px;position:relative;overflow:hidden}
+  #sFill{position:absolute;top:0;bottom:0;left:50%}
+  #cardClose{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px}
+  #cardClose:hover{color:var(--ink)}
+
+  @media (max-width:820px){
+    #panel{display:none}
+    h1{font-size:19px}
+    #bar{gap:14px;padding:10px 16px}#clock{font-size:20px}
+  }
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div id="overlay"></div>
+<div id="news"></div>
+
+<header>
+  <div>
+    <h1 class="en">MARKET <b>SENTIMENT</b> EQ</h1>
+    <div class="sub">2D フラット・センチメント・ダッシュボード — 破線＝市場平均</div>
+  </div>
+  <div class="extremes en">
+    <div class="hi">MAX <b id="maxV">+0.00</b> <span id="maxN">—</span></div>
+    <div class="lo">MIN <b id="minV">−0.00</b> <span id="minN">—</span></div>
+  </div>
+</header>
+
+<aside id="panel">
+  <div class="cap en">SECTORS セクター</div>
+  <div id="sectors"></div>
+
+  <div class="ctl">
+    <div class="cap en" style="padding:4px 0 6px">HEIGHT 高度表現</div>
+    <label>感情の強調倍率 <b id="emphV">×14</b></label>
+    <input type="range" id="emph" min="4" max="30" step="1" value="14">
+  </div>
+
+  <div class="switchrow">インク・パーティクル<div class="sw on" id="swCloud"></div></div>
+  <div class="switchrow">基準グリッドを表示<div class="sw on" id="swGrid"></div></div>
+
+  <div class="note">
+    データ: 内蔵シミュレータ（外部フィード待機中）<br>
+    外部接続: <code>window.updateMarketData(data)</code><br>
+    速報: <code>window.pushMarketNews({text, impact})</code><br>
+    <span class="warn-hint">⚠ 大口注文: largeOrder:true / volume急増 / triggerLargeOrder()</span><br>
+    <span class="op">バー・カプセルにホバー→銘柄名 ／ クリック→詳細</span>
+  </div>
+</aside>
+
+<div id="bar">
+  <button id="playBtn" title="一時停止 / 再開">❚❚</button>
+  <div class="clockbox"><div id="clock" class="en">09:00</div><small class="en">SESSION 前場</small></div>
+  <div class="speeds en">
+    <button class="spd" data-s="1">×1</button>
+    <button class="spd on" data-s="2">×2</button>
+    <button class="spd" data-s="4">×4</button>
+    <button class="spd" data-s="8">×8</button>
+  </div>
+  <div class="gauge"><div id="mood">+0.00</div><small>市場全体</small></div>
+</div>
+
+<div id="card">
+  <button id="cardClose">✕</button>
+  <div class="code en" id="cCode"></div>
+  <div class="name" id="cName"></div>
+  <div class="kv"><span>センチメント</span><b id="cSent"></b></div>
+  <div class="kv"><span>相対規模</span><b id="cSize"></b></div>
+  <div class="kv"><span>セクター平均</span><b id="cAgg"></b></div>
+  <div id="sBar"><div id="sFill"></div></div>
+</div>
+
+<script>
+/* ============================================================
+   2D フラット・センチメント・ダッシュボード  v5（最終形）
+   ------------------------------------------------------------
+   完全2D: カメラ・回転・奥行きを全廃し、純Canvas 2Dで描画。
+   ・セクター  = 基準線から伸縮する黒外枠フラットバー（＋青/−赤）
+   ・銘柄      = バー右横に縦列する黒外枠カプセル
+   ・市場平均  = 全バーを横断する黒破線（リアルタイムに上下シフト）
+   ・粒子      = ＋バー先端から濃紺インクが湧き上がり、
+                 −バー先端から濃臙脂がポタポタ滴下する2Dアニメ
+
+   ◆ 外部データ連携
+       window.updateMarketData({
+         market: 0.31,
+         sectors: [{
+           id: "semi",                    // id / name / code いずれでも可
+           sentiment: 0.62,               // 省略可: セクター平行シフト
+           largeOrder: true,              // ⚠ 大口注文シグナル
+           volume: 182000,                // 前回比1.8倍超で自動⚠
+           companies: [{ name:"東京エレクトロン", sentiment:0.9, size:0.8 }]
+         }]
+       });
+     ※ sentiment: -1.0(売り・赤)〜+1.0(買い・青) ／ size: 0〜1
+     ※ セクター平均 ±0.1 超の急変 → インクバースト自動発火
+
+   ◆ 速報ニュース通知
+       window.pushMarketNews({
+         text: "【速報】〜",
+         impact: "high" | "medium",       // 省略時 medium
+         sector: "semi"                   // 省略時は本文からセクター名を自動検出
+       });
+     → 右側からカードがスライドイン ＋ 該当バーが激しく明滅
+
+   ◆ 手動発火:
+       window.triggerFlow("semi", ±1) / window.triggerLargeOrder("bank")
+       window.setSimulator(false)         // 内蔵デモ停止
+
+   ◆ WebSocket 連携例:
+     // const ws = new WebSocket("ws://localhost:8765");
+     // ws.onmessage = e => {
+     //   const d = JSON.parse(e.data);
+     //   if (d.news) window.pushMarketNews(d.news);
+     //   else window.updateMarketData(d);
+     // };
+     // ws.onopen = () => window.setSimulator(false);
+   ============================================================ */
+(() => {
+"use strict";
+
+/* ---------- helpers ---------- */
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp  = (a, b, u) => a + (b - a) * u;
+const fmt   = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+/* color helpers (rgb arrays) */
+const C_BUY  = [6, 83, 230], C_SELL = [232, 48, 79];
+const INK_BUY = [10, 63, 184], INK_SELL = [194, 30, 64];
+const C_INK  = [20, 22, 28], C_WHITE = [255, 255, 255];
+const rgb  = (c, a=1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const mix  = (a, b, u) => [lerp(a[0],b[0],u), lerp(a[1],b[1],u), lerp(a[2],b[2],u)];
+const sign = v => v >= 0 ? C_BUY : C_SELL;
+const ink  = v => v >= 0 ? INK_BUY : INK_SELL;
+
+/* ---------- master data ---------- */
+const VISIBLE_N = 6;
+const SECTOR_DEF = [
+ ["semi","半導体","SEMI",["東京エレクトロン","レーザーテック","アドバンテスト","ルネサス","ディスコ","SCREEN","ソシオネクスト","ローム"]],
+ ["auto","自動車","AUTO",["トヨタ","ホンダ","デンソー","スズキ","SUBARU","マツダ","日産","いすゞ"]],
+ ["bank","銀行","BANK",["三菱UFJ","三井住友FG","みずほFG","りそなHD","千葉銀行","コンコルディア","ふくおかFG","京都FG"]],
+ ["pharma","医薬品","PHRM",["武田薬品","第一三共","アステラス","中外製薬","エーザイ","塩野義","小野薬品","大塚HD"]],
+ ["telecom","通信","TELE",["NTT","KDDI","ソフトバンク","楽天G","NTTデータ","LINEヤフー","IIJ","光通信"]],
+ ["energy","エネルギー","ENGY",["ENEOS","出光興産","INPEX","コスモHD","東京ガス","大阪ガス","関西電力","Jパワー"]],
+ ["retail","小売","RETL",["ファーストリテイリング","セブン&アイ","イオン","PPIH","ニトリHD","三越伊勢丹","高島屋","ローソン"]],
+ ["estate","不動産","ESTA",["三井不動産","三菱地所","住友不動産","東急不動産","野村不動産","ヒューリック","東京建物","大和ハウス"]],
+ ["tech","精密機器","PREC",["キーエンス","HOYA","オリンパス","テルモ","ニコン","島津製作所","シチズン","セイコーG"]],
+ ["ship","海運","SHIP",["日本郵船","商船三井","川崎汽船","NSユナイテッド","飯野海運","明治海運","共栄タンカー","乾汽船"]],
+];
+const SPACING = 15, ROW_HALF = (SECTOR_DEF.length - 1) * SPACING / 2;
+const BAR_W = 5.6, LANE_X = BAR_W / 2 + 4.7;         /* 銘柄レーン中心 */
+
+/* ---------- canvas ---------- */
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function resize(){
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize); resize();
+
+/* ---------- 2D layout（固定・真正面） ---------- */
+const state = { emphasis:14, marketCur:0, marketTgt:0.05, scale:8, cx:0, cy:0 };
+function layout(){
+  const sx = (W - 150) / (ROW_HALF * 2 + BAR_W + LANE_X * 2 + 10);
+  const sy = (H - 270) / (state.emphasis * 2 + 7);
+  state.scale = clamp(Math.min(sx, sy), 2.2, 26);
+  state.cx = W / 2;
+  state.cy = H * 0.52;
+}
+const SX = x => state.cx + x * state.scale;
+const SY = y => state.cy - y * state.scale;
+
+/* ---------- sectors & companies ---------- */
+const SECTORS = [];
+const overlayRoot = document.getElementById("overlay");
+SECTOR_DEF.forEach(([id, name, code, compNames], i) => {
+  const s = {
+    id, name, code, x: i * SPACING - ROW_HALF,
+    agg: 0, aggTgt: 0, prevBurstAgg: 0, lastVolume: null,
+    warnUntil: 0, flashUntil: 0, flashStrength: 1,
+    emitAcc: 0, visible: true, companies: [],
+  };
+  compNames.forEach((cn, j) => {
+    s.companies.push({
+      name: cn, sector: s,
+      cur: { s: 0, size: 0.5 },
+      tgt: { s: (Math.random() - 0.45) * 0.8, size: 0.25 + Math.random() * 0.65 },
+      active: j < VISIBLE_N, alpha: j < VISIBLE_N ? 1 : 0,
+      phase: Math.random() * Math.PI * 2,
+      rect: null,
+    });
+  });
+  /* ⚠ 大口注文ポップアップ（HTML） */
+  const ww = document.createElement("div");
+  ww.className = "warnWrap";
+  ww.style.opacity = 0;
+  ww.innerHTML = `<span class="warn"><span class="ic">⚠️</span>大口注文</span>`;
+  overlayRoot.appendChild(ww);
+  s.warnEl = ww; s.warnInner = ww.querySelector(".warn");
+  SECTORS.push(s);
+});
+
+/* ============================================================
+   2D インク・パーティクル
+     ＋: バー先端から上へ湧き上がる（市場平均線を越えて霧散）
+     −: バー先端から重力でポタポタ滴下
+   ============================================================ */
+let particlesOn = true;
+const particles = [];
+const P_MAX = 1400;
+function emit(s, dir, burst){
+  if (!particlesOn || particles.length >= P_MAX) return;
+  const h = s.agg * state.emphasis;
+  const tipY = dir > 0 ? Math.max(h, 0.3) : Math.min(h, -0.3);
+  const n = burst ? 26 + (Math.random() * 10 | 0) : 1;
+  const storm = Math.abs(s.agg) > 0.5 ? (Math.abs(s.agg) - 0.5) * 2 : 0;
+  for (let k = 0; k < n && particles.length < P_MAX; k++) {
+    if (dir > 0) {
+      particles.push({
+        x: s.x + (Math.random() - 0.5) * BAR_W * 0.9,
+        y: tipY + Math.random() * 0.5,
+        vx: (Math.random() - 0.5) * (1.2 + storm * 5),
+        vy: (burst ? 7 : 3.5) + Math.random() * (burst ? 8 : 4),
+        g: -2.2,                                     /* 減速しつつ上昇 */
+        wob: 0.6 + storm * 2.4, ph: Math.random() * 6.28,
+        life: 0, max: 1.1 + Math.random() * 1.1,
+        col: INK_BUY, r: burst ? 1.9 + Math.random() * 1.6 : 1.4 + Math.random() * 1.4,
+      });
+    } else {
+      particles.push({
+        x: s.x + (Math.random() - 0.5) * BAR_W * 0.9,
+        y: tipY - Math.random() * 0.5,
+        vx: (Math.random() - 0.5) * (0.9 + storm * 4),
+        vy: -(burst ? 2 : 0.6) - Math.random() * 1.2,
+        g: -13,                                      /* 重力で加速滴下 */
+        wob: 0.35 + storm * 2, ph: Math.random() * 6.28,
+        life: 0, max: 0.9 + Math.random() * 0.9,
+        col: INK_SELL, r: burst ? 1.9 + Math.random() * 1.6 : 1.5 + Math.random() * 1.5,
+      });
+    }
+  }
+}
+function stepParticles(dt, t){
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life += dt;
+    if (p.life > p.max) { particles.splice(i, 1); continue; }
+    p.vy += p.g * dt;
+    p.x += (p.vx + Math.sin(t * 3 + p.ph) * p.wob) * dt;
+    p.y += p.vy * dt;
+  }
+}
+function drawParticles(){
+  particles.forEach(p => {
+    const u = p.life / p.max;
+    const a = Math.sin(Math.PI * u) * 0.75;          /* インクの滲み: 出現→消失 */
+    ctx.fillStyle = rgb(p.col, a);
+    ctx.beginPath();
+    ctx.arc(SX(p.x), SY(p.y), p.r * (1 - u * 0.35), 0, 6.283);
+    ctx.fill();
+  });
+}
+function spawnBurst(s, dir){ emit(s, dir, true); }
+
+/* ============================================================
+   速報ニュース通知（NEWS FLASH）
+   ============================================================ */
+const newsRoot = document.getElementById("news");
+window.pushMarketNews = function(n){
+  if (!n || !n.text) return;
+  const impact = n.impact === "high" ? "high" : "medium";
+  /* 該当セクター: 明示指定 or 本文からセクター名を自動検出 → バー明滅 */
+  let s = null;
+  if (n.sector) s = SECTORS.find(x => x.id === n.sector || x.name === n.sector || x.code === n.sector);
+  if (!s) s = SECTORS.find(x => n.text.includes(x.name));
+  if (s) {
+    s.flashUntil = performance.now() + (impact === "high" ? 2200 : 1500);
+    s.flashStrength = impact === "high" ? 1 : 0.7;
+  }
+  /* カード生成 → 右からスライドイン */
+  const card = document.createElement("div");
+  card.className = "newsCard";
+  const hh = String(Math.floor(clockMin / 60)).padStart(2, "0");
+  const mm = String(clockMin % 60).padStart(2, "0");
+  card.innerHTML =
+    `<div class="newsHead">
+       <span class="newsBadge en ${impact}">${impact === "high" ? "速報 HIGH" : "NEWS"}</span>
+       <span class="newsTime en">${hh}:${mm}</span>
+     </div>
+     <div class="newsTxt">${n.text}</div>`;
+  newsRoot.prepend(card);
+  requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add("in")));
+  while (newsRoot.children.length > 4) newsRoot.lastChild.remove();  /* 最大4枚 */
+  setTimeout(() => {                                 /* 自動退場 */
+    card.classList.add("out");
+    setTimeout(() => card.remove(), 550);
+  }, 9000);
+};
+
+/* ============================================================
+   ⚠ 大口注文シグナル
+   ============================================================ */
+function fireLargeOrder(s){
+  s.warnUntil = performance.now() + 3000;
+  s.flashUntil = Math.max(s.flashUntil, performance.now() + 1200);
+  s.flashStrength = Math.max(s.flashStrength, 0.6);
+  s.warnInner.classList.remove("pop");
+  void s.warnInner.offsetWidth;
+  s.warnInner.classList.add("pop");
+  s.warnInner.style.opacity = 1;
+}
+window.triggerLargeOrder = sectorId => {
+  const s = SECTORS.find(x => x.id === sectorId || x.name === sectorId || x.code === sectorId);
+  if (s) fireLargeOrder(s);
+};
+
+/* ---------- aggregate & membership ---------- */
+function computeAggTgt(s){
+  const act = s.companies.filter(c => c.active);
+  let w = 0, sum = 0;
+  act.forEach(c => { const k = 0.3 + c.tgt.size; sum += c.tgt.s * k; w += k; });
+  return w ? sum / w : 0;
+}
+function rebalance(s){
+  const strength = c => Math.abs(c.tgt.s) * (0.5 + c.tgt.size * 0.5);
+  const sorted = [...s.companies].sort((a, b) => strength(b) - strength(a));
+  const shouldBeActive = new Set(sorted.slice(0, VISIBLE_N));
+  const weakestActive = s.companies.filter(c => c.active).sort((a,b) => strength(a) - strength(b))[0];
+  sorted.forEach(c => {
+    if (shouldBeActive.has(c) && !c.active) {
+      if (!weakestActive || strength(c) > strength(weakestActive) + 0.08) {
+        c.active = true;
+        if (weakestActive) weakestActive.active = false;
+      }
+    }
+  });
+  const act = s.companies.filter(c => c.active);
+  if (act.length > VISIBLE_N)
+    act.sort((a,b) => strength(a) - strength(b)).slice(0, act.length - VISIBLE_N).forEach(c => c.active = false);
+}
+
+/* ============================================================
+   PUBLIC API
+   ============================================================ */
+window.updateMarketData = function(data){
+  if (!data) return;
+  const arr = Array.isArray(data) ? data : data.sectors;
+  if (!Array.isArray(data) && data.market !== undefined)
+    state.marketTgt = clamp(+data.market, -1, 1);
+
+  if (Array.isArray(arr)) arr.forEach(d => {
+    const s = SECTORS.find(x => x.id === d.id || x.name === d.name || x.code === d.code);
+    if (!s) return;
+
+    if (Array.isArray(d.companies)) d.companies.forEach(cd => {
+      let c = s.companies.find(x => x.name === cd.name || x.name === cd.id);
+      if (!c) {
+        if (s.companies.length >= 12) {
+          const weakest = s.companies.filter(x => !x.active)
+            .sort((a,b) => Math.abs(a.tgt.s) - Math.abs(b.tgt.s))[0];
+          if (weakest) removeCompany(s, weakest); else return;
+        }
+        c = addCompany(s, cd.name || cd.id);
+      }
+      if (cd.sentiment !== undefined) c.tgt.s = clamp(+cd.sentiment, -1, 1);
+      if (cd.size !== undefined) c.tgt.size = clamp(+cd.size, 0, 1);
+    });
+
+    if (d.sentiment !== undefined && !Array.isArray(d.companies)) {
+      const target = clamp(+d.sentiment, -1, 1);
+      const delta = target - computeAggTgt(s);
+      s.companies.forEach(c => c.tgt.s = clamp(c.tgt.s + delta, -1, 1));
+    }
+
+    rebalance(s);
+    s.aggTgt = computeAggTgt(s);
+
+    const jump = s.aggTgt - s.prevBurstAgg;
+    if (jump >= 0.1)  { spawnBurst(s, +1); s.prevBurstAgg = s.aggTgt; }
+    else if (jump <= -0.1) { spawnBurst(s, -1); s.prevBurstAgg = s.aggTgt; }
+
+    if (d.largeOrder === true) fireLargeOrder(s);
+    if (d.volume !== undefined) {
+      if (s.lastVolume !== null && +d.volume > s.lastVolume * 1.8) fireLargeOrder(s);
+      s.lastVolume = +d.volume;
+    }
+  });
+
+  if (Array.isArray(data) || data.market === undefined)
+    state.marketTgt = SECTORS.reduce((a, s) => a + s.aggTgt, 0) / SECTORS.length;
+};
+window.triggerFlow = (sectorId, dir) => {
+  const s = SECTORS.find(x => x.id === sectorId || x.name === sectorId || x.code === sectorId);
+  if (s) spawnBurst(s, dir >= 0 ? 1 : -1);
+};
+
+function addCompany(s, name){
+  const comp = {
+    name, sector: s,
+    cur: { s: 0, size: 0.4 }, tgt: { s: 0, size: 0.4 },
+    active: false, alpha: 0, phase: Math.random() * Math.PI * 2, rect: null,
+  };
+  s.companies.push(comp);
+  return comp;
+}
+function removeCompany(s, c){
+  s.companies.splice(s.companies.indexOf(c), 1);
+  if (selected && selected.ref === c) { selected = null; card.classList.remove("show"); }
+}
+
+/* ---------- built-in demo simulator ---------- */
+let simOn = true;
+window.setSimulator = on => { simOn = !!on; };
+setInterval(() => {
+  if (!simOn || paused) return;
+  const payload = SECTORS.map(s => ({
+    id: s.id,
+    largeOrder: Math.random() < 0.025,
+    companies: s.companies.map(c => {
+      let ns = c.tgt.s + (Math.random() - 0.5) * 0.16 * Math.sqrt(speed) - c.tgt.s * 0.05;
+      if (Math.random() < 0.05) ns += (Math.random() < 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.3);
+      return {
+        name: c.name,
+        sentiment: clamp(ns, -1, 1),
+        size: clamp(c.tgt.size + (Math.random() - 0.5) * 0.04, 0.1, 1),
+      };
+    })
+  }));
+  window.updateMarketData({ sectors: payload });
+}, 1600);
+
+/* ダミー速報ニュース（外部フィード接続時は setSimulator(false) で停止） */
+const NEWS_POOL = [
+  { text:"【速報】半導体大手、次世代チップの量産化に成功。関連株が急騰", sector:"semi",   impact:"high",   delta:+0.35 },
+  { text:"【ニュース】自動車セクター、新型エンジンシステムの規制強化案により下落基調", sector:"auto", impact:"medium", delta:-0.28 },
+  { text:"【速報】メガバンク各行、金利上昇観測で買い優勢に", sector:"bank",   impact:"high",   delta:+0.3 },
+  { text:"【ニュース】海運大手、運賃指数の軟化を受け売り先行", sector:"ship",   impact:"medium", delta:-0.25 },
+  { text:"【速報】創薬ベンチャーの治験成功報道で医薬品セクターに資金流入", sector:"pharma", impact:"high", delta:+0.32 },
+  { text:"【ニュース】エネルギー市況の反落を受け、関連銘柄が伸び悩み", sector:"energy", impact:"medium", delta:-0.22 },
+  { text:"【ニュース】小売大手の月次売上が市場予想を上回り、堅調な推移", sector:"retail", impact:"medium", delta:+0.24 },
+  { text:"【速報】不動産セクター、大型再開発計画の発表で急伸", sector:"estate", impact:"high", delta:+0.3 },
+];
+let newsTimer = 0;
+setInterval(() => {
+  if (!simOn || paused) return;
+  newsTimer += 1.6;
+  if (newsTimer < 9 + Math.random() * 8) return;     /* 約10〜17秒間隔 */
+  newsTimer = 0;
+  const n = NEWS_POOL[Math.random() * NEWS_POOL.length | 0];
+  window.pushMarketNews(n);
+  /* ニュース内容どおりにセンチメントも動かす（バースト自動発火） */
+  const s = SECTORS.find(x => x.id === n.sector);
+  if (s) window.updateMarketData({ sectors: [{ id: n.sector, sentiment: clamp(computeAggTgt(s) + n.delta, -1, 1) }] });
+}, 1600);
+console.log("%c[SENTIMENT EQ v5] 外部フィード受付中 → window.updateMarketData(...) / window.pushMarketNews({text:'【速報】…', impact:'high', sector:'semi'}) / window.triggerLargeOrder('bank')",
+  "color:#0653e6;font-weight:bold");
+
+/* ---------- interaction（クリック選択・ホバー） ---------- */
+let selected = null, hoverSector = null;
+const card = document.getElementById("card");
+canvas.addEventListener("mousemove", e => {
+  hoverSector = null;
+  let hand = false;
+  for (const s of SECTORS) {
+    if (!s.visible) continue;
+    if (s.barRect && inRect(e.clientX, e.clientY, s.barRect)) { hoverSector = s; hand = true; break; }
+    for (const c of s.companies) {
+      if (c.rect && c.alpha > 0.3 && inRect(e.clientX, e.clientY, c.rect)) { hoverSector = s; hand = true; break; }
+    }
+    if (hoverSector) break;
+  }
+  canvas.style.cursor = hand ? "pointer" : "default";
+});
+canvas.addEventListener("click", e => {
+  for (const s of SECTORS) {
+    if (!s.visible) continue;
+    for (const c of s.companies) {
+      if (c.rect && c.alpha > 0.3 && inRect(e.clientX, e.clientY, c.rect)) {
+        selected = { type: "comp", ref: c };
+        card.classList.add("show"); updateCard(); return;
+      }
+    }
+    if (s.barRect && inRect(e.clientX, e.clientY, s.barRect)) {
+      selected = { type: "sector", ref: s };
+      card.classList.add("show"); updateCard(); return;
+    }
+  }
+});
+const inRect = (x, y, r) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+function updateCard(){
+  if (!selected) return;
+  let name, code, v, size, agg;
+  if (selected.type === "comp") {
+    const c = selected.ref;
+    name = c.name; code = c.sector.code + " / " + c.sector.name;
+    v = c.cur.s; size = c.cur.size; agg = c.sector.agg;
+  } else {
+    const s = selected.ref;
+    name = s.name; code = "SECTOR / " + s.code;
+    v = s.agg;
+    const act = s.companies.filter(c => c.active);
+    size = act.reduce((a, c) => a + c.cur.size, 0) / Math.max(1, act.length);
+    agg = s.agg;
+  }
+  document.getElementById("cCode").textContent = code;
+  document.getElementById("cName").textContent = name;
+  const el = document.getElementById("cSent");
+  el.textContent = fmt(v);
+  el.style.color = v >= 0 ? "var(--buy)" : "var(--sell)";
+  document.getElementById("cSize").textContent = (size * 100).toFixed(0) + "%";
+  const ag = document.getElementById("cAgg");
+  ag.textContent = fmt(agg);
+  ag.style.color = agg >= 0 ? "var(--buy)" : "var(--sell)";
+  const fill = document.getElementById("sFill");
+  fill.style.width = Math.abs(v) * 50 + "%";
+  fill.style.left = v >= 0 ? "50%" : (50 - Math.abs(v) * 50) + "%";
+  fill.style.background = v >= 0 ? "var(--buy)" : "var(--sell)";
+}
+document.getElementById("cardClose").onclick = () => { card.classList.remove("show"); selected = null; };
+addEventListener("keydown", e => { if (e.key === "Escape") { card.classList.remove("show"); selected = null; } });
+
+/* ---------- left panel ---------- */
+const listRoot = document.getElementById("sectors");
+SECTORS.forEach(s => {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<span class="dot"></span><span class="nm">${s.name}</span><span class="val en"></span>`;
+  row.onclick = () => {
+    s.visible = !s.visible;
+    row.classList.toggle("off", !s.visible);
+    if (!s.visible) s.warnEl.style.opacity = 0;
+  };
+  listRoot.appendChild(row);
+  s.row = row; s.rowDot = row.querySelector(".dot"); s.rowVal = row.querySelector(".val");
+});
+const emph = document.getElementById("emph");
+emph.oninput = () => {
+  state.emphasis = +emph.value;
+  document.getElementById("emphV").textContent = "×" + emph.value;
+};
+const swCloud = document.getElementById("swCloud");
+swCloud.onclick = () => { swCloud.classList.toggle("on"); particlesOn = swCloud.classList.contains("on"); if (!particlesOn) particles.length = 0; };
+let gridOn = true;
+const swGrid = document.getElementById("swGrid");
+swGrid.onclick = () => { swGrid.classList.toggle("on"); gridOn = swGrid.classList.contains("on"); };
+
+/* ---------- clock / playback ---------- */
+let paused = false, speed = 2, clockMin = 9 * 60;
+document.getElementById("playBtn").onclick = function(){
+  paused = !paused;
+  this.textContent = paused ? "▶" : "❚❚";
+};
+document.querySelectorAll(".spd").forEach(b => b.onclick = () => {
+  speed = +b.dataset.s;
+  document.querySelectorAll(".spd").forEach(x => x.classList.toggle("on", x === b));
+});
+setInterval(() => {
+  if (paused) return;
+  clockMin = (clockMin + speed) % (24 * 60);
+  document.getElementById("clock").textContent =
+    String(Math.floor(clockMin / 60)).padStart(2, "0") + ":" + String(clockMin % 60).padStart(2, "0");
+}, 1000);
+
+/* ---------- HUD refresh ---------- */
+setInterval(() => {
+  let hi = SECTORS[0], lo = SECTORS[0];
+  SECTORS.forEach(s => {
+    s.rowVal.textContent = fmt(s.agg);
+    s.rowVal.style.color = s.agg >= 0 ? "var(--buy)" : "var(--sell)";
+    s.rowDot.style.color = s.agg >= 0 ? "#0653e6" : "#e8304f";
+    s.row.classList.toggle("storm", Math.abs(s.agg) > 0.5);
+    if (s.agg > hi.agg) hi = s;
+    if (s.agg < lo.agg) lo = s;
+  });
+  document.getElementById("maxV").textContent = "+" + Math.max(0, hi.agg).toFixed(2);
+  document.getElementById("maxN").textContent = hi.name;
+  document.getElementById("minV").textContent = "−" + Math.abs(Math.min(0, lo.agg)).toFixed(2);
+  document.getElementById("minN").textContent = lo.name;
+  const m = state.marketCur;
+  const mood = document.getElementById("mood");
+  mood.textContent = fmt(m);
+  mood.style.color = Math.abs(m) < 0.08 ? "var(--ink)" : (m > 0 ? "var(--buy)" : "var(--sell)");
+  updateCard();
+}, 400);
+
+/* ---------- drawing helpers ---------- */
+function rr(x, y, w, h, r){
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ---------- main loop ---------- */
+let t = 0, lastTime = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  t += dt;
+  layout();
+
+  state.marketCur += (state.marketTgt - state.marketCur) * 0.04;
+  const K = state.emphasis, sc = state.scale;
+
+  ctx.clearRect(0, 0, W, H);
+
+  /* ===== 目盛りガイド（±0.5 / ±1.0） ===== */
+  if (gridOn) {
+    ctx.font = "600 10px Rajdhani, sans-serif";
+    ctx.textBaseline = "middle";
+    [[0.5,"#c9cede"],[1.0,"#b4bccf"],[-0.5,"#c9cede"],[-1.0,"#b4bccf"]].forEach(([lv, col]) => {
+      const y = SY(lv * K);
+      ctx.strokeStyle = col; ctx.lineWidth = lv % 1 === 0 ? 1.2 : 0.8;
+      ctx.beginPath(); ctx.moveTo(SX(-ROW_HALF - 12), y); ctx.lineTo(SX(ROW_HALF + 12), y); ctx.stroke();
+      ctx.fillStyle = "#9aa3b5";
+      ctx.textAlign = "right";
+      ctx.fillText((lv > 0 ? "+" : "−") + Math.abs(lv).toFixed(1), SX(-ROW_HALF - 13.5), y);
+    });
+  }
+
+  /* ===== インク・パーティクル（バーの背後に滲む） ===== */
+  stepParticles(dt, t);
+  drawParticles();
+
+  /* ===== 太い黒の基準線（Y=0） ===== */
+  ctx.strokeStyle = rgb(C_INK);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(SX(-ROW_HALF - 12), SY(0));
+  ctx.lineTo(SX(ROW_HALF + 12), SY(0));
+  ctx.stroke();
+
+  /* ===== 市場平均トレンド線（全バーを横断する黒破線・上下シフト） ===== */
+  const avgY = SY(state.marketCur * K);
+  ctx.save();
+  ctx.setLineDash([9, 7]);
+  ctx.strokeStyle = "rgba(20,22,28,.6)";
+  ctx.lineWidth = 1.7;
+  ctx.beginPath();
+  ctx.moveTo(SX(-ROW_HALF - 12), avgY);
+  ctx.lineTo(SX(ROW_HALF + 12), avgY);
+  ctx.stroke();
+  ctx.restore();
+  /* 平均線の値チップ（右端） */
+  {
+    const label = "市場平均 " + fmt(state.marketCur);
+    ctx.font = "700 10px 'Noto Sans JP', sans-serif";
+    const tw = ctx.measureText(label).width;
+    const bx = SX(ROW_HALF + 12) - tw - 14, by = avgY - 19;
+    ctx.fillStyle = "#fff";
+    rr(bx, by, tw + 14, 16, 8); ctx.fill();
+    ctx.strokeStyle = rgb(C_INK); ctx.lineWidth = 1.5; rr(bx, by, tw + 14, 16, 8); ctx.stroke();
+    ctx.fillStyle = state.marketCur >= 0 ? rgb(C_BUY) : rgb(C_SELL);
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(label, bx + 7, by + 8.5);
+  }
+
+  /* ===== セクター描画 ===== */
+  SECTORS.forEach((s, i) => {
+    /* 集計 */
+    let sum = 0, w = 0, minY = 0, maxY = 0;
+    s.companies.forEach(c => {
+      c.cur.s    += (c.tgt.s    - c.cur.s)    * 0.05;
+      c.cur.size += (c.tgt.size - c.cur.size) * 0.05;
+      c.alpha    += ((c.active ? 1 : 0) - c.alpha) * 0.06;
+      if (c.active) {
+        const k = 0.3 + c.cur.size;
+        sum += c.cur.s * k; w += k;
+        const yy = c.cur.s * K;
+        minY = Math.min(minY, yy); maxY = Math.max(maxY, yy);
+      }
+    });
+    s.agg = w ? sum / w : 0;
+    if (!s.visible) { s.barRect = null; s.companies.forEach(c => c.rect = null); s.warnEl.style.opacity = 0; return; }
+
+    const v = s.agg, av = Math.abs(v);
+    const h = v * K;
+    const storm = av > 0.5 ? (av - 0.5) * 2 : 0;
+
+    /* 定常インク放出（強いほど多い / 嵐でさらに増量） */
+    s.emitAcc += (0.5 + av * 3.5 + storm * 6) * dt * (particlesOn ? 1 : 0);
+    while (s.emitAcc > 1) { s.emitAcc -= 1; emit(s, v >= 0 ? 1 : -1, false); }
+
+    /* --- メインバー（黒外枠 + フラット塗り + 明滅フラッシュ） --- */
+    const bx = SX(s.x - BAR_W / 2);
+    const bw = BAR_W * sc;
+    const hPix = Math.max(Math.abs(h) * sc, 4);
+    const by = v >= 0 ? SY(0) - hPix : SY(0);
+    let fillCol = sign(v);
+    const remainF = s.flashUntil - now;
+    if (remainF > 0) {                               /* ニュース/大口の激しい明滅 */
+      const blink = 0.5 + 0.5 * Math.sin(now * 0.045);
+      fillCol = mix(fillCol, C_WHITE, blink * 0.85 * s.flashStrength * clamp(remainF / 500, 0, 1) + 0);
+    }
+    ctx.fillStyle = rgb(fillCol);
+    rr(bx, by, bw, hPix, 3); ctx.fill();
+    ctx.strokeStyle = rgb(C_INK);
+    ctx.lineWidth = remainF > 0 ? 3.5 + Math.sin(now * 0.045) * 1 : 2.5;
+    rr(bx, by, bw, hPix, 3); ctx.stroke();
+    s.barRect = [bx - 3, Math.min(by, SY(0)) - 3, bw + 6, hPix + 6];
+
+    /* 選択リング */
+    if (selected && selected.type === "sector" && selected.ref === s) {
+      ctx.save(); ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = rgb(C_INK, 0.8); ctx.lineWidth = 1.5;
+      rr(bx - 5, by - 5, bw + 10, hPix + 10, 6); ctx.stroke();
+      ctx.restore();
+    }
+
+    /* 足元ノッチ */
+    ctx.fillStyle = rgb(C_INK);
+    ctx.fillRect(SX(s.x) - bw / 2 - 2, SY(0) - 2.5, bw + 4, 5);
+
+    /* --- 銘柄カプセル（バー右横・センチメント高さの縦列） --- */
+    const showNames = hoverSector === s || (selected && selected.ref &&
+      (selected.ref === s || (selected.type === "comp" && selected.ref.sector === s)));
+    s.companies.forEach(c => {
+      if (c.alpha < 0.03) { c.rect = null; return; }
+      const cy = SY(c.cur.s * K + Math.sin(t * 0.8 + c.phase) * 0.12);
+      const len = (2.3 + c.cur.size * 2.3) * sc * c.alpha;
+      const ch = Math.max(0.95 * sc * c.alpha, 3);
+      const cx = SX(s.x + LANE_X) - len / 2;
+      ctx.globalAlpha = c.alpha;
+      ctx.fillStyle = rgb(sign(c.cur.s));
+      rr(cx, cy - ch / 2, len, ch, ch / 2); ctx.fill();
+      ctx.strokeStyle = rgb(C_INK); ctx.lineWidth = 1.8;
+      rr(cx, cy - ch / 2, len, ch, ch / 2); ctx.stroke();
+      /* 選択リング */
+      if (selected && selected.type === "comp" && selected.ref === c) {
+        ctx.save(); ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = rgb(C_INK, 0.8); ctx.lineWidth = 1.4;
+        rr(cx - 3.5, cy - ch / 2 - 3.5, len + 7, ch + 7, (ch + 7) / 2); ctx.stroke();
+        ctx.restore();
+      }
+      /* 値 → カプセル右に常時 / 名前 → ホバー・選択時 */
+      ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.font = "700 9px Rajdhani, sans-serif";
+      ctx.fillStyle = rgb(sign(c.cur.s));
+      ctx.fillText(fmt(c.cur.s), cx + len + 5, cy);
+      if (showNames) {
+        ctx.font = "600 10px 'Noto Sans JP', sans-serif";
+        ctx.fillStyle = rgb(C_INK, 0.92);
+        ctx.fillText(c.name, cx + len + 33, cy);
+      }
+      ctx.globalAlpha = 1;
+      c.rect = [cx - 2, cy - ch / 2 - 2, len + 4, ch + 4];
+    });
+
+    /* --- ラベル: セクター名＋値（最上端の上）/ コード（最下端の下） --- */
+    const topPix = Math.min(SY(Math.max(h, maxY, 0)), SY(0)) - 10;
+    const botPix = Math.max(SY(Math.min(h, minY, 0)), SY(0)) + 12;
+    ctx.textAlign = "center";
+    ctx.font = "900 12px 'Noto Sans JP', sans-serif";
+    ctx.fillStyle = rgb(C_INK);
+    ctx.fillText(s.name, SX(s.x), topPix - 12);
+    ctx.font = "700 11px Rajdhani, sans-serif";
+    ctx.fillStyle = v >= 0 ? rgb(C_BUY) : rgb(C_SELL);
+    ctx.fillText(fmt(v) + (av > 0.5 ? " ⚡" : ""), SX(s.x), topPix + 1);
+    ctx.font = "600 9px Rajdhani, sans-serif";
+    ctx.fillStyle = "#8a93a6";
+    ctx.fillText(s.code, SX(s.x), botPix + 4);
+
+    /* --- ⚠ 大口注文ポップアップ（バー最上段に3秒） --- */
+    const remainW = s.warnUntil - now;
+    if (remainW > 0) {
+      s.warnEl.style.transform = `translate(${SX(s.x)}px,${topPix - 30}px) translate(-50%,-100%)`;
+      s.warnEl.style.opacity = 1;
+      s.warnInner.style.opacity = remainW < 400 ? remainW / 400 : 1;
+    } else {
+      s.warnEl.style.opacity = 0;
+    }
+  });
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

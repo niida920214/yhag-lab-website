@@ -721,6 +721,69 @@ section {
   box-shadow: none;
 }
 
+/* ---- Tool button item wrapper (button + optional "NEW" badge / author) --
+   Wraps a single .tool-btn so an optional small author credit line can sit
+   right underneath it without disturbing the .tool-btn-list gap rhythm. */
+.tool-btn-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* "NEW!" badge — place inside the .tool-btn, after the label text.
+   Fixed vivid color (not theme-reactive) so it always pops regardless of
+   the soft-blue button it sits on, in either site theme. */
+.new-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 0.15em 0.5em;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+/* Small meta row under a tool button: "Renewal date" on the left, the
+   copyright-style credit on the right, sharing a single line (the text at
+   these lengths comfortably fits side by side without colliding). */
+.tool-btn-meta {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* Copyright-style credit line (e.g. "© chiba"), plain text by default —
+   wrap it in <a href="..."> yourself if you'd rather link to the author's
+   page/profile. Placed in markup after .tool-btn-updated, but the `order`
+   below keeps it visually on the right. */
+.tool-btn-author {
+  order: 1;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+/* "Renewal date" line — update the date whenever the linked tool changes. */
+.tool-btn-updated {
+  order: -1;
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--color-text-faint);
+  text-align: left;
+}
+
+.tool-column--dark .tool-btn-author,
+.tool-column--dark .tool-btn-updated {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 /* ---- Hero -------------------------------------------------------------*/
 .hero {
   position: relative;
