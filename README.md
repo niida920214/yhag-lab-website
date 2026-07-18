@@ -105,6 +105,27 @@ vercel            # プロジェクトルート（このフォルダ）で実行
 `<span class="status-badge status-live">公開中</span>` に変更すると、公開中であることが一目でわかる
 表示になります。
 
+## 共有写真機能（トップページの写真スロット）
+
+トップページのロゴ枠・「Yahagi Zoo」両脇の枠は、クリックで写真をアップロードして
+**全訪問者に共有**できます（保存先は Vercel Blob、API は `api/photo.js`）。
+
+セットアップ（Vercel ダッシュボードで1回だけ）:
+
+1. **Storage → Create Blob Store** でストアを作成し、このプロジェクトに接続する
+   - Access は **Public** を選択
+   - 「Add a read-write token env var to this connection」に**チェック**
+     （環境変数 `BLOB_READ_WRITE_TOKEN` が自動追加される）
+2. **Settings → Environment Variables** で `UPLOAD_PASSPHRASE` を追加する
+   （値＝アップロード用の合言葉。研究室メンバーにだけ共有する）
+3. 環境変数を追加・変更したら **Redeploy** する（反映には再デプロイが必要）
+
+仕組み: 画像はブラウザ側で長辺512pxに縮小 → `POST /api/photo?slot=<名前>` →
+合言葉をサーバーで照合 → Blob に `photos/<slot>.jpg` として上書き保存 →
+以後の訪問者は `GET /api/photo?slot=<名前>` 経由で同じ写真を見る。
+サーバーに繋がらないローカル確認時は、従来どおりその端末の localStorage に
+保存されるフォールバック動作になる。
+
 ## 今後 TODO（サイト運用者向け）
 
 - [ ] `members.html` の教員・学生氏名、専門分野を実際の情報に差し替える

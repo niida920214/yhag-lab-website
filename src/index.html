@@ -44,20 +44,19 @@
     <div class="container">
       <div class="brand-group">
         <!-- ============================================================
-             ロゴ写真スロット（クリックで画像をアップロード）
-             ・訪問者がクリックすると画像選択ダイアログが開き、選んだ写真が
-               このロゴ枠に表示されます。
-             ・写真は「その人のブラウザ（localStorage）」にだけ保存されます。
-               サーバーには送信されないため、他の訪問者には見えません。
+             ロゴ写真スロット（クリックで画像をアップロード・全員に共有）
+             ・クリックすると画像選択→合言葉入力→アップロードの流れで、
+               写真がサーバー（Vercel Blob）に保存され全訪問者に表示されます。
+             ・サーバー未接続時（ローカル確認など）はその端末のブラウザに
+               のみ保存されるフォールバック動作になります。
              ・写真未設定の間は assets/images/logo.png（無ければ白い角丸の
-               プレースホルダー）が表示されます。サイト共通のロゴにしたい
-               場合は logo.png を置き換えてください。
+               プレースホルダー）が表示されます。
         ============================================================ -->
         <button
           type="button"
           class="brand-logo-slot"
           data-photo-slot="logo"
-          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
           aria-label="ロゴ写真を設定"
         >
           <img
@@ -117,15 +116,15 @@
 
   <main id="main-content">
     <!-- ================= 中央ヒーロー：タイトル + 写真スロット×2 =================
-         タイトル両脇の枠はクリックすると端末から写真を選んで飾れる交流スペース。
-         写真は閲覧者それぞれのブラウザ（localStorage）に保存されます。 -->
+         タイトル両脇の枠はクリックで写真をアップロードして飾れる交流スペース。
+         合言葉を入れてアップロードすると全訪問者に共有されます（Vercel Blob保存）。 -->
     <section class="hero-zoo">
       <div class="container hero-zoo-row">
         <button
           type="button"
           class="photo-slot photo-slot--hero"
           data-photo-slot="hero-left"
-          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
           aria-label="左側の写真を設定"
         >
           <span class="photo-slot-placeholder">
@@ -141,7 +140,7 @@
           type="button"
           class="photo-slot photo-slot--hero"
           data-photo-slot="hero-right"
-          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
           aria-label="右側の写真を設定"
         >
           <span class="photo-slot-placeholder">
