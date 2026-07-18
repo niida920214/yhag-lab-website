@@ -42,30 +42,39 @@
 
   <header class="site-header">
     <div class="container">
-      <a href="index.html" class="brand">
+      <div class="brand-group">
         <!-- ============================================================
-             LOGO PLACEHOLDER — 【ロゴ画像の差し替え方法】
-             src/assets/images/logo.png という名前で画像ファイルを保存する
-             だけで、このロゴが自動的に切り替わります（このHTML自体は
-             書き換え不要）。
-             ・推奨サイズ: 正方形 80×80px 前後（PNG / SVG、背景透過推奨）
-             ・ファイルがまだ無い間は、白い角丸スクエアのプレースホルダー
-               （logo-placeholder.svg）が自動的に表示されます。
-             ・別のファイル名にしたい場合は、下の src="assets/images/logo.png"
-               の部分だけを書き換えてください。
+             ロゴ写真スロット（クリックで画像をアップロード）
+             ・訪問者がクリックすると画像選択ダイアログが開き、選んだ写真が
+               このロゴ枠に表示されます。
+             ・写真は「その人のブラウザ（localStorage）」にだけ保存されます。
+               サーバーには送信されないため、他の訪問者には見えません。
+             ・写真未設定の間は assets/images/logo.png（無ければ白い角丸の
+               プレースホルダー）が表示されます。サイト共通のロゴにしたい
+               場合は logo.png を置き換えてください。
         ============================================================ -->
-        <img
-          src="assets/images/logo.png"
-          alt="Yahagi Lab. ロゴ"
-          class="brand-logo"
-          width="40"
-          height="40"
-          onerror="this.onerror=null; this.src='assets/images/logo-placeholder.svg';"
-        />
-        <span>
-          Yahagi Lab.
-        </span>
-      </a>
+        <button
+          type="button"
+          class="brand-logo-slot"
+          data-photo-slot="logo"
+          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          aria-label="ロゴ写真を設定"
+        >
+          <img
+            src="assets/images/logo.png"
+            alt=""
+            class="brand-logo"
+            width="40"
+            height="40"
+            onerror="this.onerror=null; this.src='assets/images/logo-placeholder.svg';"
+          />
+        </button>
+        <a href="index.html" class="brand">
+          <span>
+            Yahagi Lab.
+          </span>
+        </a>
+      </div>
 
       <!-- ============================================================
            年度進捗バー（4/1 〜 翌年3/31 を100%として、今日の位置を表示）
@@ -82,18 +91,16 @@
 
       <div class="header-actions">
         <!-- ============================================================
-             【構築中ボタン】退室メール（オレンジ = Upcoming の目印）
-             機能が完成したら、下の <button ... disabled> を
-             <a class="btn btn-upcoming" href="実際のURLやページ"> に変更し、
-             disabled 属性と <span class="upcoming-badge">Upcoming</span> を
-             削除すれば、通常の使えるボタンになります。
+             【仮実装】退室メール（オレンジ = Upcoming の目印）
+             クリックすると送信確認モーダル（ページ下部の #mail-modal）が
+             開きます。現在はモック（仮）で、実際のメールは送信されません。
+             実配信の実装が完了したら Upcoming バッジを外してください。
         ============================================================ -->
         <button
           type="button"
           class="btn btn-upcoming"
-          disabled
-          aria-disabled="true"
-          title="現在準備中の機能です（Upcoming）"
+          id="mail-open-btn"
+          title="退室メールを送信する（仮実装）"
         >
           <i data-lucide="mail"></i>
           退室メール
@@ -109,10 +116,40 @@
   </header>
 
   <main id="main-content">
-    <!-- ================= 中央ヒーロー：巨大タイトルのみ ================= -->
+    <!-- ================= 中央ヒーロー：タイトル + 写真スロット×2 =================
+         タイトル両脇の枠はクリックすると端末から写真を選んで飾れる交流スペース。
+         写真は閲覧者それぞれのブラウザ（localStorage）に保存されます。 -->
     <section class="hero-zoo">
-      <div class="container">
+      <div class="container hero-zoo-row">
+        <button
+          type="button"
+          class="photo-slot photo-slot--hero"
+          data-photo-slot="hero-left"
+          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          aria-label="左側の写真を設定"
+        >
+          <span class="photo-slot-placeholder">
+            <i data-lucide="image-plus"></i>
+            写真を追加
+          </span>
+          <img alt="" hidden />
+        </button>
+
         <h1>Yahagi Zoo</h1>
+
+        <button
+          type="button"
+          class="photo-slot photo-slot--hero"
+          data-photo-slot="hero-right"
+          title="クリックで写真を設定（この端末のブラウザにのみ保存されます）"
+          aria-label="右側の写真を設定"
+        >
+          <span class="photo-slot-placeholder">
+            <i data-lucide="image-plus"></i>
+            写真を追加
+          </span>
+          <img alt="" hidden />
+        </button>
       </div>
     </section>
 
@@ -178,20 +215,7 @@
               </div>
               <!-- Button 1 End -->
 
-              <!-- Button 2 Start：Market Sentiment 3D -->
-              <div class="tool-btn-item">
-                <a class="tool-btn" href="tools/market-sentiment-3d_V4.html">
-                  <i data-lucide="trending-up"></i>
-                  市場センチメント
-                </a>
-                <div class="tool-btn-meta">
-                  <p class="tool-btn-author">© shoichi</p>
-                  <p class="tool-btn-updated">Renewal date: 2026/07/13</p>
-                </div>
-              </div>
-              <!-- Button 2 End -->
-
-              <!-- Button 3 Start：Tokyo Real Estate Dashboard -->
+              <!-- Button 2 Start：Tokyo Real Estate Dashboard -->
               <div class="tool-btn-item">
                 <a class="tool-btn" href="tools/tokyo_real_estate_dashboard.html">
                   <i data-lucide="building-2"></i>
@@ -200,6 +224,19 @@
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© shoichi</p>
                   <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
+                </div>
+              </div>
+              <!-- Button 2 End -->
+
+              <!-- Button 3 Start：Market Sentiment 3D -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/market-sentiment-3d_V4.html">
+                  <i data-lucide="trending-up"></i>
+                  市場センチメント
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/13</p>
                 </div>
               </div>
               <!-- Button 3 End -->
@@ -223,12 +260,16 @@
               </div>
               <!-- Button 1 End -->
 
-              <!-- Button 2 Start：ナビエストークス（リンク先未定。ページ完成後、
-                   下の <button> を <a href="実際のパス" class="tool-btn"> に置き換えてください） -->
+              <!-- Button 2 Start：ナビエストークス（構築中）
+                   ページ完成後は下の <button> を
+                   <a href="実際のパス" class="tool-btn"> に置き換え、
+                   disabled と has-overlay クラス、
+                   <span class="tool-btn-overlay">Upcoming</span> を削除してください -->
               <div class="tool-btn-item">
-                <button type="button" class="tool-btn">
+                <button type="button" class="tool-btn is-upcoming has-overlay" disabled>
                   <i data-lucide="waves"></i>
                   ナビエストークス
+                  <span class="tool-btn-overlay" aria-hidden="true">Upcoming</span>
                 </button>
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© --</p>
@@ -243,20 +284,7 @@
           <div class="tool-column tool-column--dark">
             <h3>実験ツール</h3>
             <div class="tool-btn-list">
-              <!-- Button 1 Start：Flame Luminance Analyzer（既存ページへリンク済み） -->
-              <div class="tool-btn-item">
-                <a class="tool-btn" href="tools/flame-analyzer.html">
-                  <i data-lucide="flame"></i>
-                  Flame Luminance Analyzer
-                </a>
-                <div class="tool-btn-meta">
-                  <p class="tool-btn-author">© shoichi</p>
-                  <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
-                </div>
-              </div>
-              <!-- Button 1 End -->
-
-              <!-- Button 2 Start：Frequency Analyzer（既存ページへリンク済み） -->
+              <!-- Button 1 Start：Frequency Analyzer（既存ページへリンク済み） -->
               <div class="tool-btn-item">
                 <a class="tool-btn" href="tools/flame_flicker_analyzer_7.html">
                   <i data-lucide="radio"></i>
@@ -267,9 +295,9 @@
                   <p class="tool-btn-updated">Renewal date: 2026/07/17</p>
                 </div>
               </div>
-              <!-- Button 2 End -->
+              <!-- Button 1 End -->
 
-              <!-- Button 3 Start：Experiment Studio -->
+              <!-- Button 2 Start：Experiment Studio -->
               <div class="tool-btn-item">
                 <a class="tool-btn" href="tools/experiment_studio_v2.html">
                   <i data-lucide="flask-conical"></i>
@@ -278,6 +306,19 @@
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© shoichi</p>
                   <p class="tool-btn-updated">Renewal date: 2026/07/13</p>
+                </div>
+              </div>
+              <!-- Button 2 End -->
+
+              <!-- Button 3 Start：Flame Luminance Analyzer（既存ページへリンク済み） -->
+              <div class="tool-btn-item">
+                <a class="tool-btn" href="tools/flame-analyzer.html">
+                  <i data-lucide="flame"></i>
+                  Flame Luminance Analyzer
+                </a>
+                <div class="tool-btn-meta">
+                  <p class="tool-btn-author">© shoichi</p>
+                  <p class="tool-btn-updated">Renewal date: 2026/07/14</p>
                 </div>
               </div>
               <!-- Button 3 End -->
@@ -296,5 +337,66 @@
       <p>案があればしょういちまで</p>
     </div>
   </footer>
+
+  <!-- ================= 退室メール送信モーダル（仮実装） =================
+       ヘッダーの「退室メール」ボタンで開きます。
+       ・送信者リストに人を足したい場合は、下の <label class="mail-member">
+         ブロックを1個コピーして value と表示名を書き換えるだけでOK。
+       ・現在はモックのため「はい（送信）」を押しても実際のメールは
+         送信されません（送信したことにする確認表示のみ）。
+  ============================================================= -->
+  <div class="modal-backdrop" id="mail-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
+      <h2 id="mail-modal-title">
+        <i data-lucide="mail"></i>
+        退室メールを送信
+      </h2>
+
+      <p class="modal-desc">送信者として使うメンバーを選んでください。</p>
+
+      <!-- 送信者選択（スクロール可能なリスト） -->
+      <div class="mail-member-list" role="radiogroup" aria-label="送信者を選択">
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="yahagi" />
+          <span>矢作（先生）</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="shoichi" checked />
+          <span>shoichi</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="chiba" />
+          <span>chiba</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="miwa" />
+          <span>miwa</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="member5" />
+          <span>メンバー5（仮）</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="member6" />
+          <span>メンバー6（仮）</span>
+        </label>
+        <label class="mail-member">
+          <input type="radio" name="mail-sender" value="member7" />
+          <span>メンバー7（仮）</span>
+        </label>
+      </div>
+
+      <p class="modal-confirm">本当に送信しますか？</p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary" id="mail-send-btn">はい（送信）</button>
+        <button type="button" class="btn btn-outline" id="mail-cancel-btn">キャンセル</button>
+      </div>
+
+      <p class="modal-note" id="mail-result" aria-live="polite">
+        ※現在は仮実装です。実際のメールはまだ送信されません。
+      </p>
+    </div>
+  </div>
 </body>
 </html>

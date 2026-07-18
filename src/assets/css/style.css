@@ -356,6 +356,29 @@ section {
   text-decoration: none;
 }
 
+/* Header logo photo slot: wraps the logo <img> in a clickable button that
+   opens a file picker (see initPhotoSlots in script.js). */
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.brand-logo-slot {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 0;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.brand-logo-slot:hover {
+  transform: scale(1.06);
+  box-shadow: var(--shadow-md);
+}
+
 .brand-mark {
   width: 40px;
   height: 40px;
@@ -537,14 +560,10 @@ section {
 }
 
 @media (max-width: 640px) {
+  /* スマホでもラベルは読めるサイズを維持し、バッジだけ省略して幅を節約 */
   .btn-upcoming {
-    padding: 0.55em 0.7em;
-    font-size: 0;
-    gap: 0;
-  }
-
-  .btn-upcoming svg {
-    margin: 0;
+    padding: 0.65em 0.9em;
+    font-size: 0.85rem;
   }
 
   .btn-upcoming .upcoming-badge {
@@ -662,6 +681,77 @@ section {
   font-size: clamp(2.75rem, 9vw, 5.5rem);
   letter-spacing: -0.02em;
   margin-bottom: 0;
+}
+
+/* Title row: photo slot — Yahagi Zoo — photo slot */
+.hero-zoo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.25rem, 4vw, 3rem);
+}
+
+/* ---- Photo slots (visitor-uploaded photos, stored in localStorage) ------
+   Clicking a slot opens a file picker; the chosen image is saved in the
+   viewer's own browser (localStorage) and shown on their next visits.
+   Handled by initPhotoSlots() in script.js. */
+.photo-slot {
+  position: relative;
+  padding: 0;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.photo-slot:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.photo-slot--hero {
+  width: clamp(96px, 14vw, 170px);
+  height: clamp(96px, 14vw, 170px);
+  flex-shrink: 0;
+}
+
+.photo-slot-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.photo-slot-placeholder svg {
+  width: 22px;
+  height: 22px;
+}
+
+.photo-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* When a photo is set, the dashed frame becomes a clean solid frame */
+.photo-slot.has-photo {
+  border-style: solid;
+}
+
+.photo-slot.has-photo .photo-slot-placeholder {
+  display: none;
 }
 
 .btn-lg {
@@ -782,6 +872,31 @@ section {
   color: var(--tool-btn-upcoming-text);
   transform: none;
   box-shadow: none;
+}
+
+/* Overlay variant: the button's own label/icon fade out and a bold
+   "Upcoming" stamp sits on top (e.g. ナビエストークス). */
+.tool-btn.has-overlay {
+  position: relative;
+}
+
+.tool-btn.has-overlay > :not(.tool-btn-overlay) {
+  opacity: 0.3;
+}
+
+.tool-btn-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tool-btn-upcoming-text);
+  opacity: 1 !important;
+  pointer-events: none;
 }
 
 /* ---- Tool button item wrapper (button + optional "NEW" badge / author) --
@@ -1454,6 +1569,128 @@ section {
 
 .mt-lg {
   margin-top: 2.5rem;
+}
+
+/* ---- Mail confirmation modal (退室メール・仮実装) ------------------------
+   Opened by #mail-open-btn; wiring lives in initMailModal() in script.js. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(8, 12, 22, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}
+
+.modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.75rem;
+}
+
+.modal h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1.2rem;
+  margin-bottom: 0.4em;
+}
+
+.modal h2 svg {
+  width: 20px;
+  height: 20px;
+  color: var(--btn-orange-bg);
+}
+
+.modal-desc {
+  font-size: 0.9rem;
+  margin-bottom: 0.9em;
+}
+
+/* Scrollable sender list */
+.mail-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem;
+  background: var(--color-bg-subtle);
+}
+
+.mail-member {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.55em 0.75em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  transition: background-color var(--transition-fast);
+}
+
+.mail-member:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.mail-member input {
+  accent-color: var(--btn-blue-bg);
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.mail-member:has(input:checked) {
+  background: color-mix(in srgb, var(--btn-blue-bg) 14%, transparent);
+  font-weight: 700;
+}
+
+.modal-confirm {
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 1.1em 0 0.75em;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.modal-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.modal-note {
+  margin: 1em 0 0;
+  font-size: 0.78rem;
+  color: var(--color-text-faint);
+}
+
+.modal-note.is-success {
+  color: #1d7a43;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .modal-note.is-success {
+  color: #63d493;
 }
 
 /* ---- Minimal page footnote (bottom-right note) ------------------------- */

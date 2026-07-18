@@ -74,8 +74,150 @@
     }
   }
 
+  /* ---- Photo slots ---------------------------------------------------------
+   * [data-photo-slot] の付いたボタンをクリックすると画像選択ダイアログが開き、
+   * 選んだ写真を縮小してその閲覧者のブラウザ（localStorage）に保存・表示する。
+   * サーバーには送信しないので、写真は「その端末のブラウザでだけ」見える。
+   * ------------------------------------------------------------------------ */
+  var PHOTO_KEY_PREFIX = "yahagi-photo-";
+  var PHOTO_MAX_DIM = 512; // 保存前にこのサイズまで縮小（localStorage容量対策）
+
+  function applyPhoto(slot, dataUrl) {
+    var img = slot.querySelector("img");
+    if (!img) return;
+    img.src = dataUrl;
+    img.hidden = false;
+    slot.classList.add("has-photo");
+  }
+
+  function initPhotoSlots() {
+    var slots = document.querySelectorAll("[data-photo-slot]");
+    if (!slots.length) return;
+
+    var fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.hidden = true;
+    document.body.appendChild(fileInput);
+    var activeSlot = null;
+
+    slots.forEach(function (slot) {
+      var key = PHOTO_KEY_PREFIX + slot.getAttribute("data-photo-slot");
+      try {
+        var saved = localStorage.getItem(key);
+        if (saved) applyPhoto(slot, saved);
+      } catch (err) {
+        /* localStorage unavailable — slot still works for this page view */
+      }
+
+      slot.addEventListener("click", function () {
+        activeSlot = slot;
+        fileInput.value = "";
+        fileInput.click();
+      });
+    });
+
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file || !activeSlot) return;
+      var slot = activeSlot;
+      var key = PHOTO_KEY_PREFIX + slot.getAttribute("data-photo-slot");
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        var image = new Image();
+        image.onload = function () {
+          /* 長辺 PHOTO_MAX_DIM px まで縮小してから保存する */
+          var scale = Math.min(1, PHOTO_MAX_DIM / Math.max(image.width, image.height));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          applyPhoto(slot, dataUrl);
+          try {
+            localStorage.setItem(key, dataUrl);
+          } catch (err) {
+            /* 容量超過等 — 表示はされるが保存されない */
+          }
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ---- 退室メール確認モーダル（仮実装） --------------------------------------
+   * 「退室メール」→ 背景が暗くなりモーダル表示 → 送信者を選択 →
+   * はい／キャンセル。現在はモックで、実際のメールは送信しない。
+   * ------------------------------------------------------------------------ */
+  function initMailModal() {
+    var openBtn = document.getElementById("mail-open-btn");
+    var modal = document.getElementById("mail-modal");
+    if (!openBtn || !modal) return;
+
+    var sendBtn = document.getElementById("mail-send-btn");
+    var cancelBtn = document.getElementById("mail-cancel-btn");
+    var result = document.getElementById("mail-result");
+    var defaultNote = result ? result.textContent : "";
+
+    function openModal() {
+      modal.hidden = false;
+      document.body.style.overflow = "hidden";
+      if (result) {
+        result.textContent = defaultNote;
+        result.classList.remove("is-success");
+      }
+      var checked = modal.querySelector("input[name='mail-sender']:checked");
+      if (checked) checked.focus();
+    }
+
+    function closeModal() {
+      modal.hidden = true;
+      document.body.style.overflow = "";
+      openBtn.focus();
+    }
+
+    openBtn.addEventListener("click", openModal);
+    cancelBtn.addEventListener("click", closeModal);
+
+    /* 背景（モーダル外）クリックで閉じる */
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) closeModal();
+    });
+
+    window.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) closeModal();
+    });
+
+    sendBtn.addEventListener("click", function () {
+      var checked = modal.querySelector("input[name='mail-sender']:checked");
+      var senderName = checked
+        ? checked.parentElement.querySelector("span").textContent
+        : "（未選択）";
+      var today = new Date();
+      var dateStr =
+        today.getFullYear() + "/" +
+        String(today.getMonth() + 1).padStart(2, "0") + "/" +
+        String(today.getDate()).padStart(2, "0");
+
+      /* --- 仮実装ここから ---------------------------------------------
+         実配信にする場合はここを API 呼び出し（例: Vercel Functions 経由で
+         Gmail API / メール送信サービスを叩く）に置き換える。 */
+      if (result) {
+        result.textContent =
+          "（仮）" + dateStr + " 付の退室メールを「" + senderName +
+          "」として送信しました。※実際のメールはまだ送信されていません。";
+        result.classList.add("is-success");
+      }
+      /* --- 仮実装ここまで --------------------------------------------- */
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     renderFiscalProgress();
+    initPhotoSlots();
+    initMailModal();
 
     document.querySelectorAll(".theme-toggle").forEach(function (btn) {
       btn.setAttribute("aria-pressed", String(currentTheme() === "dark"));
