@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ナビエ・ストークス方程式 体験ラボ</title>
+<style>
+:root{
+  --bg:#0C111B;
+  --panel:#121A29;
+  --panel2:#0E1520;
+  --line:rgba(120,140,180,.18);
+  --text:#E9EDF5;
+  --muted:#8C97AC;
+  --c-time:#9FB3D1;   /* 非定常項 */
+  --c-conv:#FF7847;   /* 対流項 */
+  --c-press:#57C7F0;  /* 圧力項 */
+  --c-visc:#6FD98F;   /* 粘性項 */
+  --c-force:#F2C14E;  /* 外力項 */
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px 90px}
+header{padding:44px 0 8px}
+.eyebrow{
+  font-size:12px;letter-spacing:.22em;color:var(--muted);
+  text-transform:uppercase;margin-bottom:10px;
+}
+h1{font-size:clamp(22px,4.4vw,34px);font-weight:700;letter-spacing:.02em}
+h1 small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:6px;letter-spacing:.06em}
+section{margin-top:56px}
+.sec-head{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:18px}
+.sec-num{font-family:Georgia,serif;font-style:italic;font-size:15px;color:var(--muted);white-space:nowrap}
+h2{font-size:clamp(17px,3vw,21px);font-weight:700}
+.lead{color:var(--muted);font-size:14px;margin-bottom:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+canvas{display:block;width:100%;height:auto;border-radius:10px;background:var(--panel2);touch-action:none}
+
+/* ===== hero equation ===== */
+.eq-stage{
+  background:linear-gradient(180deg,#121A29 0%,#0E1520 100%);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 16px 20px;margin-top:22px;
+}
+.equation{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:2px;font-family:Georgia,"Times New Roman",serif;
+  font-size:clamp(19px,4.2vw,30px);
+}
+.term{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:8px 10px;border-radius:10px;cursor:pointer;
+  border:1px solid transparent;transition:all .18s ease;
+  position:relative;
+}
+.term:hover{border-color:var(--line);background:rgba(255,255,255,.03)}
+.term.active{border-color:currentColor;background:rgba(255,255,255,.05);box-shadow:0 0 22px -6px currentColor}
+.term .tag{
+  position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);
+  font-family:inherit;font-size:10.5px;color:var(--muted);white-space:nowrap;
+  font-style:normal;font-family:"Hiragino Sans","Yu Gothic",sans-serif;letter-spacing:.05em;
+}
+.t-time{color:var(--c-time)} .t-conv{color:var(--c-conv)} .t-press{color:var(--c-press)}
+.t-visc{color:var(--c-visc)} .t-force{color:var(--c-force)}
+.op{color:#5E6B84;padding:0 4px;font-size:.95em}
+.frac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.15;font-size:.82em}
+.frac .bar{width:100%;height:1px;background:currentColor;margin:2px 0;opacity:.9}
+i.v{font-style:italic;font-weight:700}
+sup{font-size:.6em}
+.eq-brackets{
+  display:flex;justify-content:center;gap:12px;flex-wrap:wrap;
+  margin-top:34px;font-size:12px;color:var(--muted);
+}
+.eq-brackets span{border-top:1px solid var(--line);padding:6px 18px 0;letter-spacing:.05em}
+.explain{
+  margin-top:18px;border-top:1px dashed var(--line);padding-top:16px;
+  min-height:96px;font-size:14.5px;
+}
+.explain h3{font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.explain h3 .dot{width:9px;height:9px;border-radius:50%;background:currentColor;display:inline-block}
+.explain p{color:#C6CEDD}
+.explain .hint{color:var(--muted);font-size:12.5px;margin-top:8px}
+.assume{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;letter-spacing:.04em}
+
+/* ===== controls ===== */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px 22px;margin-top:16px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.ctl label b{font-weight:600}
+.ctl output{font-family:Georgia,serif;font-style:italic;color:var(--text)}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+  background:#2A3550;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--thumb,#9FB3D1);border:2px solid #0C111B;cursor:pointer;
+  box-shadow:0 0 10px -2px var(--thumb,#9FB3D1);
+}
+input[type=range]::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;background:var(--thumb,#9FB3D1);
+  border:2px solid #0C111B;cursor:pointer;
+}
+.ctl.conv{--thumb:var(--c-conv)} .ctl.visc{--thumb:var(--c-visc)}
+.ctl.press{--thumb:var(--c-press)} .ctl.force{--thumb:var(--c-force)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+button{
+  background:#1B2436;border:1px solid var(--line);color:var(--text);
+  padding:7px 14px;border-radius:8px;font-size:13px;cursor:pointer;
+  font-family:inherit;transition:background .15s;
+}
+button:hover{background:#243049}
+button.primary{background:#2A3550}
+button:focus-visible,.term:focus-visible,input:focus-visible{outline:2px solid #57C7F0;outline-offset:2px}
+.toggles{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:13.5px}
+.toggles label{display:flex;align-items:center;gap:7px;cursor:pointer}
+.toggles input{width:16px;height:16px;accent-color:#57C7F0}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.note{font-size:13px;color:var(--muted);margin-top:12px}
+.note b{color:#C6CEDD;font-weight:600}
+.stat{font-family:Georgia,serif;font-style:italic}
+
+/* ===== cards ===== */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.card h3{font-size:15.5px;margin-bottom:4px}
+.card .sub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+
+/* Reynolds */
+.re-big{font-family:Georgia,serif;font-style:italic;font-size:clamp(26px,5vw,38px);margin:8px 0 2px}
+.re-regime{font-size:14px;font-weight:600;margin-bottom:10px}
+.re-bar{position:relative;height:10px;border-radius:5px;overflow:hidden;
+  background:linear-gradient(90deg,#6FD98F 0%,#6FD98F 42%,#F2C14E 46%,#F2C14E 50%,#FF7847 54%,#FF7847 100%);}
+.re-marker{position:absolute;top:-4px;width:2px;height:18px;background:#fff;box-shadow:0 0 8px #fff}
+.re-scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:4px;font-family:Georgia,serif;font-style:italic}
+select{
+  background:#1B2436;color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:6px 10px;font-family:inherit;font-size:13px;width:100%;
+}
+.div-read{font-size:14px;margin-top:10px}
+.div-read .val{font-family:Georgia,serif;font-style:italic;font-size:20px}
+footer{margin-top:70px;border-top:1px solid var(--line);padding-top:16px;font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">FLUID &amp; COMBUSTION LAB / 教材</div>
+  <h1>ナビエ・ストークス方程式 体験ラボ
+    <small>各項を手で動かして「流れの支配方程式」を身体で理解する</small>
+  </h1>
+</header>
+
+<!-- ================= HERO : the equation ================= -->
+<div class="eq-stage">
+  <div class="equation" id="equation">
+    <span class="term t-time active" data-term="time" tabindex="0">
+      <span class="frac"><span>∂<i class="v">u</i></span><span class="bar"></span><span>∂t</span></span>
+      <span class="tag">非定常項</span>
+    </span>
+    <span class="op">+</span>
+    <span class="term t-conv" data-term="conv" tabindex="0">
+      (<i class="v">u</i>·∇)<i class="v">u</i>
+      <span class="tag">対流項</span>
+    </span>
+    <span class="op">=</span>
+    <span class="term t-press" data-term="press" tabindex="0">
+      −<span class="frac"><span>1</span><span class="bar"></span><span>ρ</span></span>∇p
+      <span class="tag">圧力項</span>
+    </span>
+    <span class="op">+</span>
+    <span class="term t-visc" data-term="visc" tabindex="0">
+      ν∇<sup>2</sup><i class="v">u</i>
+      <span class="tag">粘性項</span>
+    </span>
+    <span class="op">+</span>
+    <span class="term t-force" data-term="force" tabindex="0">
+      <i class="v">f</i>
+      <span class="tag">外力項</span>
+    </span>
+  </div>
+  <div class="eq-brackets">
+    <span>左辺＝物質微分 D<i>u</i>/Dt（流体粒子の加速度）</span>
+    <span>右辺＝単位質量あたりに働く力</span>
+  </div>
+  <div class="explain" id="explain"></div>
+  <div class="assume">※ 非圧縮性・ニュートン流体を仮定（ρ = 一定、ν = μ/ρ：動粘性係数）。項をタップ／クリックすると解説が切り替わります。</div>
+</div>
+
+<!-- ================= 実験 1 : 1D ================= -->
+<section id="sec1">
+  <div class="sec-head"><span class="sec-num">実験 I</span><h2>各項のツマミを回す — 1次元で波形がどう変わるか</h2></div>
+  <p class="lead">1次元の速度分布 u(x) に対して、方程式の各項の「効き具合」をバーで変えられます。対流だけにすると波が突っ立ち（衝撃波）、粘性だけにするとなだらかに拡散します。</p>
+  <div class="panel">
+    <canvas id="cv1d" width="920" height="330"></canvas>
+    <div class="controls">
+      <div class="ctl conv">
+        <label><b style="color:var(--c-conv)">対流項</b> <output id="o-a">×1.00</output></label>
+        <input type="range" id="s-a" min="0" max="2" step="0.05" value="1">
+      </div>
+      <div class="ctl visc">
+        <label><b style="color:var(--c-visc)">粘性 ν</b> <output id="o-nu">0.0020</output></label>
+        <input type="range" id="s-nu" min="0" max="0.01" step="0.0002" value="0.002">
+      </div>
+      <div class="ctl press">
+        <label><b style="color:var(--c-press)">圧力勾配（一様）</b> <output id="o-g">0.00</output></label>
+        <input type="range" id="s-g" min="-1" max="1" step="0.05" value="0">
+      </div>
+      <div class="ctl force">
+        <label><b style="color:var(--c-force)">外力（中央を押す）</b> <output id="o-f">0.00</output></label>
+        <input type="range" id="s-f" min="-1" max="1" step="0.05" value="0">
+      </div>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="ck-terms" checked> 各項の寄与 ∂u/∂t の内訳を表示</label>
+      <label><input type="checkbox" id="ck-ghost" checked> 初期波形を薄く表示</label>
+    </div>
+    <div class="btnrow">
+      <button class="primary" id="b-run">⏸ 一時停止</button>
+      <button id="b-reset">↺ リセット</button>
+      <span style="width:10px"></span>
+      <button id="p-burgers">プリセット：衝撃波（対流のみ）</button>
+      <button id="p-diff">プリセット：純粋拡散（粘性のみ）</button>
+      <button id="p-channel">プリセット：圧力駆動＋粘性</button>
+    </div>
+    <div class="legend" id="legend1d">
+      <span><i style="background:#E9EDF5"></i>u(x)</span>
+      <span><i style="background:var(--c-conv)"></i>対流の寄与</span>
+      <span><i style="background:var(--c-visc)"></i>粘性の寄与</span>
+      <span><i style="background:var(--c-press)"></i>圧力の寄与</span>
+      <span><i style="background:var(--c-force)"></i>外力の寄与</span>
+    </div>
+    <p class="note"><b>観察のポイント：</b>対流項は波の高い所ほど速く進ませるので前面が切り立つ（非線形性）。粘性項は曲率 ∂²u/∂x² に比例して凸凹をならす。両方あるときの釣り合いが <span class="stat">Re</span> の意味です。</p>
+  </div>
+</section>
+
+<!-- ================= 実験 2 : 2D ================= -->
+<section id="sec2">
+  <div class="sec-head"><span class="sec-num">実験 II</span><h2>2次元の流れをかき混ぜる — 項をON/OFFする</h2></div>
+  <p class="lead">キャンバス上をドラッグすると力を加えて煙（高温ガス）を注入できます。項のON/OFFに加えて、浮力（外力項）で自然対流プルームを起こしたり、表示を渦度 ω に切り替えて渦の回転向きを見ることもできます。</p>
+  <div class="panel">
+    <div class="grid2">
+      <div>
+        <canvas id="cv2d" width="512" height="512"></canvas>
+      </div>
+      <div>
+        <div class="toggles" style="flex-direction:column;align-items:flex-start;gap:10px;margin-top:0">
+          <label><input type="checkbox" id="ck-adv" checked> <b style="color:var(--c-conv)">対流項</b>（流れが自分と煙を運ぶ）</label>
+          <label><input type="checkbox" id="ck-visc2" checked> <b style="color:var(--c-visc)">粘性項</b>（渦がなまる）</label>
+          <label><input type="checkbox" id="ck-proj" checked> <b style="color:var(--c-press)">圧力項</b>（∇·u = 0 を強制）</label>
+          <label><input type="checkbox" id="ck-heat"> <b style="color:var(--c-force)">熱源</b>（下端中央を加熱し続ける）</label>
+        </div>
+        <div class="controls" style="grid-template-columns:1fr">
+          <div class="ctl visc">
+            <label><b style="color:var(--c-visc)">動粘性係数 ν</b> <output id="o-nu2">0.00010</output></label>
+            <input type="range" id="s-nu2" min="0" max="0.002" step="0.00005" value="0.0001">
+          </div>
+          <div class="ctl force">
+            <label><b style="color:var(--c-force)">浮力 β（外力項 f = βT ĝ）</b> <output id="o-buoy">0.00</output></label>
+            <input type="range" id="s-buoy" min="0" max="3" step="0.05" value="0">
+          </div>
+        </div>
+        <div class="toggles">
+          <span style="color:var(--muted);font-size:13px">表示：</span>
+          <label><input type="radio" name="disp2d" id="rd-smoke" checked> 煙・温度 T</label>
+          <label><input type="radio" name="disp2d" id="rd-vort"> 渦度 ω = ∂v/∂x − ∂u/∂y</label>
+        </div>
+        <div class="btnrow">
+          <button class="primary" id="b-puff">◉ パフを注入</button>
+          <button id="b-plume">🔥 プリセット：上昇プルーム</button>
+          <button id="b-clear2">↺ クリア</button>
+        </div>
+        <p class="note">発散の最大値 <span class="stat">max|∇·u|</span> = <b id="divmax">0.000</b><br>
+        <b>試すこと：</b>①対流OFF → 煙が運ばれず、その場で滲むだけ。②粘性を最大 → 蜂蜜のように渦がすぐ死ぬ。③圧力OFF → 流体が湧いたり潰れたり、「非圧縮」が破れて煙がダマになる。④熱源ON＋浮力を上げる → 温度差だけで上昇流（自然対流プルーム）が生まれる。ろうそくの炎が上に伸びる理由。⑤渦度表示に切り替え → 反時計回り（橙）と時計回り（青）の渦対がプルームの両脇に見える。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 実験 3 : 定義の体験 ================= -->
+<section id="sec3">
+  <div class="sec-head"><span class="sec-num">実験 III</span><h2>定義を体験する</h2></div>
+
+  <div class="grid2">
+    <!-- 物質微分 -->
+    <div class="panel card">
+      <h3>物質微分 D/Dt — 「乗って測る」と「立って測る」</h3>
+      <div class="sub">温度場 T(x) は時間変化しない定常場（∂T/∂t = 0）。それでも流れに乗った粒子の温度計は変化する。これが移流 (u·∇)T。</div>
+      <canvas id="cvmd" width="440" height="300"></canvas>
+      <div class="controls" style="grid-template-columns:1fr">
+        <div class="ctl press">
+          <label><b>粒子の流速 u</b> <output id="o-umd">0.15</output></label>
+          <input type="range" id="s-umd" min="0" max="0.5" step="0.01" value="0.15">
+        </div>
+      </div>
+      <p class="note">u = 0 にすると 2 本の線が一致します。DT/Dt = ∂T/∂t + u·∇T の第2項が「乗っているから見える変化」。運動方程式の左辺 Du/Dt もまったく同じ構造です。</p>
+    </div>
+
+    <!-- 発散 -->
+    <div class="panel card">
+      <h3>連続の式 ∇·u = 0 — 入った分だけ出ていく</h3>
+      <div class="sub">検査体積の各面の流速をバーで変えて、出入りの収支（発散）を体感する。非圧縮流ではこれが常にゼロ。</div>
+      <canvas id="cvdiv" width="440" height="300"></canvas>
+      <div class="controls">
+        <div class="ctl press"><label><b>左面 u<sub>L</sub></b> <output id="o-ul">0.40</output></label>
+          <input type="range" id="s-ul" min="-1" max="1" step="0.05" value="0.4"></div>
+        <div class="ctl press"><label><b>右面 u<sub>R</sub></b> <output id="o-ur">0.40</output></label>
+          <input type="range" id="s-ur" min="-1" max="1" step="0.05" value="0.4"></div>
+        <div class="ctl press"><label><b>下面 v<sub>B</sub></b> <output id="o-vb">0.00</output></label>
+          <input type="range" id="s-vb" min="-1" max="1" step="0.05" value="0"></div>
+        <div class="ctl press"><label><b>上面 v<sub>T</sub></b> <output id="o-vt">0.00</output></label>
+          <input type="range" id="s-vt" min="-1" max="1" step="0.05" value="0"></div>
+      </div>
+      <div class="div-read">∇·u = (u<sub>R</sub>−u<sub>L</sub>) + (v<sub>T</sub>−v<sub>B</sub>) = <span class="val" id="divval">0.00</span>　<b id="divlabel"></b></div>
+      <div class="btnrow"><button id="b-divzero">∇·u = 0 に合わせる</button></div>
+      <p class="note">実験IIで圧力項をOFFにしたときに破れていたのが、この収支です。圧力は「収支を合わせる係」として瞬時に決まります。</p>
+    </div>
+  </div>
+
+  <!-- Reynolds -->
+  <div class="panel card" style="margin-top:18px">
+    <h3>レイノルズ数 Re = UL/ν — 対流項と粘性項の綱引き</h3>
+    <div class="sub">代表速度 U・代表長さ L・流体を選ぶと、実験Iで見た「突っ立たせる力」と「ならす力」のどちらが勝つかが決まる。</div>
+    <div class="grid2">
+      <div>
+        <div class="controls" style="grid-template-columns:1fr">
+          <div class="ctl conv"><label><b>代表速度 U</b> <output id="o-U">1.0 m/s</output></label>
+            <input type="range" id="s-U" min="-2" max="1.7" step="0.05" value="0"></div>
+          <div class="ctl force"><label><b>代表長さ L</b> <output id="o-L">0.010 m</output></label>
+            <input type="range" id="s-L" min="-3.3" max="0.3" step="0.05" value="-2"></div>
+          <div class="ctl visc"><label><b>流体（動粘性係数 ν）</b> <output id="o-nu3"></output></label>
+            <select id="sel-fluid">
+              <option value="1.5e-5" selected>空気（20 °C）ν ≈ 1.5×10⁻⁵ m²/s</option>
+              <option value="1.7e-5">メタン ν ≈ 1.7×10⁻⁵ m²/s</option>
+              <option value="1.0e-6">水（20 °C）ν ≈ 1.0×10⁻⁶ m²/s</option>
+              <option value="1.0e-4">エンジンオイル ν ≈ 1.0×10⁻⁴ m²/s</option>
+              <option value="5.0e-3">蜂蜜 ν ≈ 5×10⁻³ m²/s</option>
+            </select></div>
+        </div>
+      </div>
+      <div>
+        <div class="re-big">Re = <span id="reval">670</span></div>
+        <div class="re-regime" id="reregime">層流</div>
+        <div class="re-bar"><div class="re-marker" id="remarker" style="left:40%"></div></div>
+        <div class="re-scale"><span>10⁻²</span><span>10⁰</span><span>10²</span><span>10⁴</span><span>10⁶</span><span>10⁸</span></div>
+        <p class="note" id="renote"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  流体・燃焼研究室 教材 / ナビエ・ストークス方程式 体験ラボ — 2D流れは J. Stam の Stable Fluids 法（教育用の粗い格子）によるデモです。定量的な値ではなく「項の役割」の直観をつかむために使ってください。
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   0. 用語解説（項クリック）
+============================================================ */
+(function(){
+  var DATA = {
+    time:{c:"var(--c-time)",t:"非定常項　∂u/∂t",
+      p:"その場所に立って観測したときの、速度の時間変化率。じっと固定した風速計の針の動きに相当します。時間が経っても流れが変わらない「定常流」ではこの項はゼロですが、燃焼器の振動燃焼や乱流のように時々刻々変わる流れでは主役になります。",
+      h:"実験Iで波形が動いている＝この項が生きている状態。"},
+    conv:{c:"var(--c-conv)",t:"対流項（移流項）　(u·∇)u",
+      p:"流体が「自分自身の速度」を運ぶ効果。速い部分は速いまま前へ進むので、波の前面が切り立ちます。u が2回掛かる唯一の非線形項で、乱流・渦・カオスの根源。NS方程式が解析的に解けない元凶もこの項です。",
+      h:"実験Iで対流だけにすると衝撃波が立つのを確認。Re が大きい流れ＝この項が支配する流れ。"},
+    press:{c:"var(--c-press)",t:"圧力項　−(1/ρ)∇p",
+      p:"圧力の高い側から低い側へ流体を押す力。非圧縮流では圧力は独自の時間発展を持たず、「∇·u = 0（連続の式）を常に満たすように」瞬時に決まる調整役です。ポンプで流れを駆動するのもこの項。",
+      h:"実験IIで圧力項をOFFにすると非圧縮性が破れる様子を観察。"},
+    visc:{c:"var(--c-visc)",t:"粘性項　ν∇²u",
+      p:"速度分布の凸凹（曲率）に比例して、速度差をならす拡散項。分子どうしの運動量のやり取りが正体で、運動エネルギーを熱に散逸させます。壁の近くで流れが減速する境界層もこの項の仕業。",
+      h:"実験Iで粘性だけにすると波が溶けていく。ν は「運動量の拡散係数」。"},
+    force:{c:"var(--c-force)",t:"外力項　f",
+      p:"重力・浮力・電磁力など、外から加わる単位質量あたりの力。燃焼では温度差による浮力（自然対流）が火炎の形を支配することが多く、ろうそくの炎が上に伸びるのはこの項＋重力の効果です。",
+      h:"実験Iの「外力」バーは中央を押し続けることに対応。実験IIでは「熱源＋浮力β」で f = βT ĝ を体験できる — 温度差だけで上昇プルームが立ち上がる。"}
+  };
+  var box = document.getElementById("explain");
+  function show(key){
+    var d = DATA[key];
+    box.innerHTML = '<h3 style="color:'+d.c+'"><span class="dot"></span>'+d.t+'</h3><p>'+d.p+'</p><p class="hint">▶ '+d.h+'</p>';
+  }
+  var terms = document.querySelectorAll(".term");
+  terms.forEach(function(el){
+    function act(){
+      terms.forEach(function(t){t.classList.remove("active");});
+      el.classList.add("active");
+      show(el.dataset.term);
+    }
+    el.addEventListener("click",act);
+    el.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){e.preventDefault();act();} });
+  });
+  show("time");
+})();
+
+/* ============================================================
+   1. 実験I : 1D シミュレーション
+   ∂u/∂t = -α u ∂u/∂x + ν ∂²u/∂x² - G + f(x)
+============================================================ */
+(function(){
+  var N=160, dx=1/N;
+  var u=new Float32Array(N), u0=new Float32Array(N);
+  var cv=document.getElementById("cv1d"), ctx=cv.getContext("2d");
+  var sA=document.getElementById("s-a"), sNu=document.getElementById("s-nu"),
+      sG=document.getElementById("s-g"), sF=document.getElementById("s-f");
+  var oA=document.getElementById("o-a"), oNu=document.getElementById("o-nu"),
+      oG=document.getElementById("o-g"), oF=document.getElementById("o-f");
+  var ckT=document.getElementById("ck-terms"), ckG=document.getElementById("ck-ghost");
+  var running=true;
+  var wallMode=false; // true: 両端 no-slip 壁（圧力駆動プリセット用）
+  var fShape=new Float32Array(N);
+  for(var i=0;i<N;i++){ var x=(i+0.5)*dx; fShape[i]=Math.exp(-Math.pow((x-0.5)/0.08,2)); }
+
+  function initSine(){ for(var i=0;i<N;i++){var x=(i+0.5)*dx; u[i]=0.8*Math.sin(2*Math.PI*x);} u0.set(u); }
+  function initPulse(){ for(var i=0;i<N;i++){var x=(i+0.5)*dx; u[i]=0.9*Math.exp(-Math.pow((x-0.35)/0.07,2));} u0.set(u); }
+  function initZero(){ for(var i=0;i<N;i++)u[i]=0; u0.set(u); }
+  var currentInit=initSine;
+  initSine();
+
+  function upd(){ 
+    oA.textContent="×"+(+sA.value).toFixed(2);
+    oNu.textContent=(+sNu.value).toFixed(4);
+    oG.textContent=(+sG.value).toFixed(2);
+    oF.textContent=(+sF.value).toFixed(2);
+  }
+  [sA,sNu,sG,sF].forEach(function(s){s.addEventListener("input",upd);});
+  upd();
+
+  // 各項の寄与を計算
+  var tConv=new Float32Array(N), tVisc=new Float32Array(N),
+      tPress=new Float32Array(N), tForce=new Float32Array(N);
+  function rhs(alpha,nu,G,F){
+    var maxu=0;
+    for(var i=0;i<N;i++){ var a=Math.abs(u[i]); if(a>maxu)maxu=a; }
+    for(var i=0;i<N;i++){
+      if(wallMode&&(i===0||i===N-1)){ tConv[i]=0;tVisc[i]=0;tPress[i]=0;tForce[i]=0; continue; }
+      var ip,im,uip,uim;
+      if(wallMode){ ip=i+1; im=i-1; uip=u[ip]; uim=u[im]; }
+      else { ip=(i+1)%N; im=(i-1+N)%N; uip=u[ip]; uim=u[im]; }
+      var dudx = u[i]>0 ? (u[i]-uim)/dx : (uip-u[i])/dx;
+      tConv[i]  = -alpha*u[i]*dudx;
+      tVisc[i]  = nu*(uip-2*u[i]+uim)/(dx*dx);
+      tPress[i] = -G;
+      tForce[i] = F*fShape[i];
+    }
+    return maxu;
+  }
+  function step(){
+    var alpha=+sA.value, nu=+sNu.value, G=+sG.value, F=+sF.value;
+    var maxu=rhs(alpha,nu,G,F);
+    var dtC = maxu>1e-6 ? 0.35*dx/(alpha*maxu+1e-9) : 1;
+    var dtV = nu>1e-9 ? 0.35*dx*dx/(2*nu) : 1;
+    var dt = Math.min(0.002, dtC, dtV);
+    for(var i=0;i<N;i++){
+      u[i]+= dt*(tConv[i]+tVisc[i]+tPress[i]+tForce[i]);
+      if(u[i]>3)u[i]=3; if(u[i]<-3)u[i]=-3;
+    }
+    if(wallMode){ u[0]=0; u[N-1]=0; }
+  }
+
+  var W=cv.width,H=cv.height, y0=H/2, sy=H*0.32;
+  function px(i){ return (i+0.5)/N*W; }
+  function py(val){ return y0-val*sy; }
+  function drawCurve(arr,scale,color,lw){
+    ctx.beginPath();
+    for(var i=0;i<N;i++){ var X=px(i),Y=py(arr[i]*scale); if(i===0)ctx.moveTo(X,Y); else ctx.lineTo(X,Y); }
+    ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.stroke();
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // axis
+    ctx.strokeStyle="rgba(120,140,180,.25)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(W,y0); ctx.stroke();
+    ctx.fillStyle="rgba(140,151,172,.8)"; ctx.font="12px Georgia"; 
+    ctx.fillText("u = 0",8,y0-6);
+    ctx.fillText("x →",W-34,y0+16);
+    if(wallMode){
+      ctx.strokeStyle="rgba(140,151,172,.6)"; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(2,10); ctx.lineTo(2,H-10); ctx.moveTo(W-2,10); ctx.lineTo(W-2,H-10); ctx.stroke();
+      ctx.fillStyle="rgba(140,151,172,.8)";
+      ctx.fillText("壁 (u=0)",10,26); ctx.fillText("壁 (u=0)",W-62,26);
+    }
+    if(ckG.checked){ drawCurve(u0,1,"rgba(233,237,245,.18)",1.5); }
+    if(ckT.checked){
+      var mT=0;
+      for(var k=0;k<N;k++){
+        var m1=Math.max(Math.abs(tConv[k]),Math.abs(tVisc[k]),Math.abs(tPress[k]),Math.abs(tForce[k]));
+        if(m1>mT)mT=m1;
+      }
+      if(mT>1e-5){
+        var cs=getComputedStyle(document.documentElement);
+        var sc=0.55/mT; // 正規化表示
+        drawCurve(tConv, sc, cs.getPropertyValue("--c-conv").trim(),1.2);
+        drawCurve(tVisc, sc, cs.getPropertyValue("--c-visc").trim(),1.2);
+        drawCurve(tPress,sc, cs.getPropertyValue("--c-press").trim(),1.2);
+        drawCurve(tForce,sc, cs.getPropertyValue("--c-force").trim(),1.2);
+        ctx.fillStyle="rgba(140,151,172,.7)"; ctx.font="11px sans-serif";
+        ctx.fillText("細線＝各項の寄与（最大値で正規化した相対表示）",8,H-8);
+      }
+    }
+    // main curve + glow fill
+    ctx.beginPath(); ctx.moveTo(px(0),y0);
+    for(var i=0;i<N;i++) ctx.lineTo(px(i),py(u[i]));
+    ctx.lineTo(px(N-1),y0); ctx.closePath();
+    ctx.fillStyle="rgba(233,237,245,.06)"; ctx.fill();
+    drawCurve(u,1,"#E9EDF5",2.2);
+  }
+
+  var bRun=document.getElementById("b-run");
+  bRun.addEventListener("click",function(){
+    running=!running; bRun.textContent = running?"⏸ 一時停止":"▶ 再開";
+  });
+  document.getElementById("b-reset").addEventListener("click",function(){ currentInit(); });
+  document.getElementById("p-burgers").addEventListener("click",function(){
+    wallMode=false; sA.value=1.5; sNu.value=0; sG.value=0; sF.value=0; upd(); currentInit=initSine; initSine();
+  });
+  document.getElementById("p-diff").addEventListener("click",function(){
+    wallMode=false; sA.value=0; sNu.value=0.008; sG.value=0; sF.value=0; upd(); currentInit=initPulse; initPulse();
+  });
+  document.getElementById("p-channel").addEventListener("click",function(){
+    wallMode=true; sA.value=0; sNu.value=0.01; sG.value=-0.1; sF.value=0; upd();
+    currentInit=initZero; initZero();
+  });
+
+  window.__sim1d=function(){
+    if(running){ var ns=wallMode?24:6; for(var k=0;k<ns;k++) step(); }
+    else { rhs(+sA.value,+sNu.value,+sG.value,+sF.value); }
+    draw();
+  };
+})();
+
+/* ============================================================
+   2. 実験II : 2D Stable Fluids (Jos Stam)
+============================================================ */
+(function(){
+  var N=64, S=(N+2)*(N+2);
+  function IX(i,j){ return i+(N+2)*j; }
+  var u=new Float32Array(S), v=new Float32Array(S),
+      up=new Float32Array(S), vp=new Float32Array(S),
+      d=new Float32Array(S), dp=new Float32Array(S);
+  var cv=document.getElementById("cv2d"), ctx=cv.getContext("2d");
+  var img=ctx.createImageData(N,N);
+  var off=document.createElement("canvas"); off.width=N; off.height=N;
+  var octx=off.getContext("2d");
+  var ckAdv=document.getElementById("ck-adv"), ckVis=document.getElementById("ck-visc2"),
+      ckPro=document.getElementById("ck-proj"), ckHeat=document.getElementById("ck-heat");
+  var sNu=document.getElementById("s-nu2"), oNu=document.getElementById("o-nu2");
+  var sBu=document.getElementById("s-buoy"), oBu=document.getElementById("o-buoy");
+  var rdVort=document.getElementById("rd-vort");
+  sNu.addEventListener("input",function(){ oNu.textContent=(+sNu.value).toFixed(5); });
+  oNu.textContent=(+sNu.value).toFixed(5);
+  sBu.addEventListener("input",function(){ oBu.textContent=(+sBu.value).toFixed(2); });
+  var divEl=document.getElementById("divmax");
+
+  function setBnd(b,x){
+    for(var i=1;i<=N;i++){
+      x[IX(0,i)]   = b===1 ? -x[IX(1,i)] : x[IX(1,i)];
+      x[IX(N+1,i)] = b===1 ? -x[IX(N,i)] : x[IX(N,i)];
+      x[IX(i,0)]   = b===2 ? -x[IX(i,1)] : x[IX(i,1)];
+      x[IX(i,N+1)] = b===2 ? -x[IX(i,N)] : x[IX(i,N)];
+    }
+    x[IX(0,0)]=0.5*(x[IX(1,0)]+x[IX(0,1)]);
+    x[IX(0,N+1)]=0.5*(x[IX(1,N+1)]+x[IX(0,N)]);
+    x[IX(N+1,0)]=0.5*(x[IX(N,0)]+x[IX(N+1,1)]);
+    x[IX(N+1,N+1)]=0.5*(x[IX(N,N+1)]+x[IX(N+1,N)]);
+  }
+  function linSolve(b,x,x0,a,c){
+    for(var k=0;k<18;k++){
+      for(var j=1;j<=N;j++)for(var i=1;i<=N;i++){
+        x[IX(i,j)]=(x0[IX(i,j)]+a*(x[IX(i-1,j)]+x[IX(i+1,j)]+x[IX(i,j-1)]+x[IX(i,j+1)]))/c;
+      }
+      setBnd(b,x);
+    }
+  }
+  function diffuse(b,x,x0,diff,dt){
+    var a=dt*diff*N*N;
+    linSolve(b,x,x0,a,1+4*a);
+  }
+  function advect(b,dd,d0,uu,vv,dt){
+    var dt0=dt*N;
+    for(var j=1;j<=N;j++)for(var i=1;i<=N;i++){
+      var x=i-dt0*uu[IX(i,j)], y=j-dt0*vv[IX(i,j)];
+      if(x<0.5)x=0.5; if(x>N+0.5)x=N+0.5;
+      if(y<0.5)y=0.5; if(y>N+0.5)y=N+0.5;
+      var i0=Math.floor(x), i1=i0+1, j0=Math.floor(y), j1=j0+1;
+      var s1=x-i0,s0=1-s1,t1=y-j0,t0=1-t1;
+      dd[IX(i,j)]=s0*(t0*d0[IX(i0,j0)]+t1*d0[IX(i0,j1)])+s1*(t0*d0[IX(i1,j0)]+t1*d0[IX(i1,j1)]);
+    }
+    setBnd(b,dd);
+  }
+  function project(uu,vv,p,div){
+    for(var j=1;j<=N;j++)for(var i=1;i<=N;i++){
+      div[IX(i,j)]=-0.5*(uu[IX(i+1,j)]-uu[IX(i-1,j)]+vv[IX(i,j+1)]-vv[IX(i,j-1)])/N;
+      p[IX(i,j)]=0;
+    }
+    setBnd(0,div); setBnd(0,p);
+    linSolve(0,p,div,1,4);
+    for(var j2=1;j2<=N;j2++)for(var i2=1;i2<=N;i2++){
+      uu[IX(i2,j2)]-=0.5*N*(p[IX(i2+1,j2)]-p[IX(i2-1,j2)]);
+      vv[IX(i2,j2)]-=0.5*N*(p[IX(i2,j2+1)]-p[IX(i2,j2-1)]);
+    }
+    setBnd(1,uu); setBnd(2,vv);
+  }
+  function maxDiv(){
+    var m=0;
+    for(var j=1;j<=N;j++)for(var i=1;i<=N;i++){
+      var dv=Math.abs(0.5*(u[IX(i+1,j)]-u[IX(i-1,j)]+v[IX(i,j+1)]-v[IX(i,j-1)])/N*N);
+      if(dv>m)m=dv;
+    }
+    return m;
+  }
+
+  // interaction
+  var drag=false, mx=0,my=0,pmx=0,pmy=0, addDye=false;
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    var cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+    mx=cx/r.width; my=cy/r.height;
+  }
+  cv.addEventListener("pointerdown",function(e){ drag=true; addDye=true; pos(e); pmx=mx;pmy=my; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove",function(e){ if(drag)pos(e); });
+  window.addEventListener("pointerup",function(){ drag=false; });
+
+  function puff(){
+    var cx=0.3+0.4*Math.random(), cy=0.55+0.3*Math.random();
+    var ang=-Math.PI/2+(Math.random()-0.5)*1.2, sp=3+Math.random()*3;
+    var i0=Math.round(cx*N), j0=Math.round(cy*N);
+    for(var dj=-2;dj<=2;dj++)for(var di=-2;di<=2;di++){
+      var i=i0+di,j=j0+dj;
+      if(i>=1&&i<=N&&j>=1&&j<=N){
+        d[IX(i,j)]+=1.4;
+        u[IX(i,j)]+=Math.cos(ang)*sp;
+        v[IX(i,j)]+=Math.sin(ang)*sp;
+      }
+    }
+  }
+  document.getElementById("b-puff").addEventListener("click",puff);
+  document.getElementById("b-plume").addEventListener("click",function(){
+    u.fill(0); v.fill(0); d.fill(0);
+    ckHeat.checked=true; sBu.value=1.5; oBu.textContent="1.50";
+    ckAdv.checked=true; ckPro.checked=true;
+  });
+  document.getElementById("b-clear2").addEventListener("click",function(){
+    u.fill(0);v.fill(0);d.fill(0);
+  });
+  puff();
+
+  function colormap(c){
+    // 0→背景, 0.35→炎橙, 0.7→琥珀, 1→白熱
+    if(c<0)c=0; if(c>1)c=1;
+    var r,g,b;
+    if(c<0.35){ var t=c/0.35; r=12+t*(255-12); g=17+t*(90-17); b=27+t*(40-27); }
+    else if(c<0.7){ var t2=(c-0.35)/0.35; r=255; g=90+t2*(190-90); b=40+t2*(80-40); }
+    else { var t3=(c-0.7)/0.3; r=255; g=190+t3*(245-190); b=80+t3*(225-80); }
+    return [r,g,b];
+  }
+
+  function vortColor(w,scale){
+    // 反時計回り(ω>0, y上向き基準)=橙 / 時計回り=青。ここでは画面座標系の符号を反転して物理系に合わせる
+    var t=w/scale; if(t>1)t=1; if(t<-1)t=-1;
+    var bg=[12,17,27], hot=[255,110,50], cold=[70,160,245];
+    var c = t>=0? hot: cold, a=Math.abs(t);
+    a=Math.pow(a,0.6);
+    return [bg[0]+(c[0]-bg[0])*a, bg[1]+(c[1]-bg[1])*a, bg[2]+(c[2]-bg[2])*a];
+  }
+
+  window.__sim2d=function(){
+    var dt=0.1, visc=ckVis.checked? +sNu.value : 0, buoy=+sBu.value;
+    // mouse force
+    if(drag){
+      var fi=Math.min(N,Math.max(1,Math.round(mx*N)));
+      var fj=Math.min(N,Math.max(1,Math.round(my*N)));
+      u[IX(fi,fj)]+= (mx-pmx)*140;
+      v[IX(fi,fj)]+= (my-pmy)*140;
+      if(addDye) d[IX(fi,fj)]+=1.2;
+      pmx=mx; pmy=my;
+    }
+    // 熱源：下端中央で加熱し続ける（ゆらぎ付き）
+    if(ckHeat.checked){
+      var hc=Math.round(N/2)+Math.round((Math.random()-0.5)*2);
+      for(var di=-2;di<=2;di++){
+        var ii=hc+di;
+        if(ii>=1&&ii<=N){
+          d[IX(ii,N)]+=0.45; d[IX(ii,N-1)]+=0.3;
+        }
+      }
+    }
+    // 浮力（外力項）：高温ほど上向きの力。画面座標は y 下向きなので v を減らす
+    if(buoy>0){
+      for(var j0=1;j0<=N;j0++)for(var i0=1;i0<=N;i0++){
+        v[IX(i0,j0)]-= dt*buoy*d[IX(i0,j0)];
+      }
+    }
+    // velocity step
+    if(visc>0){ up.set(u); vp.set(v); diffuse(1,u,up,visc,dt); diffuse(2,v,vp,visc,dt); }
+    if(ckPro.checked) project(u,v,up,vp);
+    if(ckAdv.checked){ up.set(u); vp.set(v); advect(1,u,up,up,vp,dt); advect(2,v,vp,up,vp,dt); }
+    if(ckPro.checked) project(u,v,up,vp);
+    // dye (温度)
+    if(ckAdv.checked){ dp.set(d); advect(0,d,dp,u,v,dt); }
+    for(var i=0;i<S;i++){ d[i]*=0.994; if(d[i]>1.6)d[i]=1.6; }
+    divEl.textContent=maxDiv().toFixed(3);
+    // render
+    var px=img.data;
+    if(rdVort.checked){
+      // 渦度 ω を計算し最大値でソフト正規化
+      var wmax=0, W2=new Float32Array(N*N);
+      for(var j=1;j<=N;j++)for(var i2=1;i2<=N;i2++){
+        // 物理系(y上向き)の ω = ∂v/∂x − ∂u/∂y。画面 y は下向きなので符号反転
+        var w = -0.5*N*((v[IX(i2+1,j)]-v[IX(i2-1,j)]) - (u[IX(i2,j+1)]-u[IX(i2,j-1)]));
+        W2[(j-1)*N+(i2-1)]=w;
+        var aw=Math.abs(w); if(aw>wmax)wmax=aw;
+      }
+      var scale=Math.max(6,wmax*0.7);
+      for(var k2=0;k2<N*N;k2++){
+        var c2=vortColor(W2[k2],scale), k4=k2*4;
+        px[k4]=c2[0]; px[k4+1]=c2[1]; px[k4+2]=c2[2]; px[k4+3]=255;
+      }
+    } else {
+      for(var j=1;j<=N;j++)for(var i2=1;i2<=N;i2++){
+        var c=colormap(d[IX(i2,j)]);
+        var k=((j-1)*N+(i2-1))*4;
+        px[k]=c[0]; px[k+1]=c[1]; px[k+2]=c[2]; px[k+3]=255;
+      }
+    }
+    octx.putImageData(img,0,0);
+    ctx.imageSmoothingEnabled=true;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.drawImage(off,0,0,cv.width,cv.height);
+  };
+})();
+
+/* ============================================================
+   3. 物質微分デモ
+============================================================ */
+(function(){
+  var cv=document.getElementById("cvmd"), ctx=cv.getContext("2d");
+  var W=cv.width,H=cv.height;
+  var sU=document.getElementById("s-umd"), oU=document.getElementById("o-umd");
+  sU.addEventListener("input",function(){ oU.textContent=(+sU.value).toFixed(2); });
+  var xp=0.1, probeX=0.3;
+  var hist1=[],hist2=[],MAX=170;
+  function T(x){ x=x-Math.floor(x); return 50+30*Math.sin(2*Math.PI*x); }
+  function tcol(t){ // 20..80 -> blue..orange
+    var s=(t-20)/60; if(s<0)s=0; if(s>1)s=1;
+    var r=40+s*(255-40), g=90+s*(120-90), b=200+s*(50-200);
+    return "rgb("+(r|0)+","+(g|0)+","+(b|0)+")";
+  }
+  window.__simMD=function(){
+    var uSpd=+sU.value, dt=1/60;
+    xp+=uSpd*dt; if(xp>1)xp-=1;
+    hist1.push(T(probeX)); hist2.push(T(xp));
+    if(hist1.length>MAX){hist1.shift();hist2.shift();}
+    ctx.clearRect(0,0,W,H);
+    // field band
+    var by=18,bh=78;
+    for(var i=0;i<W;i++){
+      ctx.fillStyle=tcol(T(i/W));
+      ctx.fillRect(i,by,1.2,bh);
+    }
+    ctx.fillStyle="rgba(140,151,172,.9)"; ctx.font="11px sans-serif";
+    ctx.fillText("定常な温度場 T(x)  （∂T/∂t = 0）",8,13);
+    // fixed probe
+    var fx=probeX*W;
+    ctx.strokeStyle="#57C7F0"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(fx,by-4); ctx.lineTo(fx,by+bh+4); ctx.stroke();
+    ctx.fillStyle="#57C7F0"; ctx.fillText("固定センサ",fx-28,by+bh+18);
+    // particle
+    var pxx=xp*W, pyy=by+bh/2;
+    ctx.beginPath(); ctx.arc(pxx,pyy,7,0,7); ctx.fillStyle="#FF7847"; ctx.fill();
+    ctx.strokeStyle="#0C111B"; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle="#FF7847"; ctx.fillText("流体粒子 →",Math.min(pxx+10,W-70),pyy-10);
+    // strip chart
+    var cy0=140, ch=140;
+    ctx.strokeStyle="rgba(120,140,180,.25)"; ctx.lineWidth=1;
+    ctx.strokeRect(0.5,cy0+0.5,W-1,ch-1);
+    ctx.fillStyle="rgba(140,151,172,.9)";
+    ctx.fillText("センサの読み（時間 →）",8,cy0+14);
+    function line(hist,color){
+      ctx.beginPath();
+      for(var i=0;i<hist.length;i++){
+        var X=i/(MAX-1)*(W-16)+8;
+        var Y=cy0+ch-14-((hist[i]-15)/70)*(ch-34);
+        if(i===0)ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+      }
+      ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+    }
+    line(hist1,"#57C7F0");
+    line(hist2,"#FF7847");
+    ctx.fillStyle="#57C7F0"; ctx.fillText("固定点：∂T/∂t = 0（不変）",8,cy0+ch+14);
+    ctx.fillStyle="#FF7847"; ctx.fillText("粒子に乗る：DT/Dt = u·∇T ≠ 0",190,cy0+ch+14);
+  };
+})();
+
+/* ============================================================
+   4. 発散（連続の式）デモ
+============================================================ */
+(function(){
+  var cv=document.getElementById("cvdiv"), ctx=cv.getContext("2d");
+  var W=cv.width,H=cv.height;
+  var s={ul:document.getElementById("s-ul"),ur:document.getElementById("s-ur"),
+          vb:document.getElementById("s-vb"),vt:document.getElementById("s-vt")};
+  var o={ul:document.getElementById("o-ul"),ur:document.getElementById("o-ur"),
+          vb:document.getElementById("o-vb"),vt:document.getElementById("o-vt")};
+  Object.keys(s).forEach(function(k){
+    s[k].addEventListener("input",function(){ o[k].textContent=(+s[k].value).toFixed(2); });
+  });
+  document.getElementById("b-divzero").addEventListener("click",function(){
+    s.ur.value=s.ul.value; s.vt.value=s.vb.value;
+    o.ur.textContent=(+s.ur.value).toFixed(2);
+    o.vt.textContent=(+s.vt.value).toFixed(2);
+  });
+  var valEl=document.getElementById("divval"), labEl=document.getElementById("divlabel");
+  // cell geometry
+  var cx0=110,cy0=60,cw=220,chh=180;
+  var P=[]; for(var i=0;i<70;i++)P.push([Math.random(),Math.random()]);
+  function arrow(x,y,dx,dy,color){
+    var len=Math.hypot(dx,dy); if(len<1e-3)return;
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx,y+dy); ctx.stroke();
+    var ang=Math.atan2(dy,dx);
+    ctx.beginPath();
+    ctx.moveTo(x+dx,y+dy);
+    ctx.lineTo(x+dx-9*Math.cos(ang-0.4),y+dy-9*Math.sin(ang-0.4));
+    ctx.lineTo(x+dx-9*Math.cos(ang+0.4),y+dy-9*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill();
+  }
+  window.__simDiv=function(){
+    var uL=+s.ul.value,uR=+s.ur.value,vB=+s.vb.value,vT=+s.vt.value;
+    var div=(uR-uL)+(vT-vB);
+    valEl.textContent=(div>=0?"+":"")+div.toFixed(2);
+    var col, lab;
+    if(Math.abs(div)<0.051){ col="#6FD98F"; lab="非圧縮 ✓（入る量＝出る量）"; }
+    else if(div>0){ col="#FF7847"; lab="湧き出し（膨張）— 質量が保存されない！"; }
+    else { col="#57C7F0"; lab="吸い込み（圧縮）— 質量が保存されない！"; }
+    valEl.style.color=col; labEl.style.color=col; labEl.textContent=lab;
+    // particles: u(x)=uL+(uR-uL)sx, v(y)=vB+(vT-vB)sy  (v正=上)
+    var dt=1/60, spd=0.55;
+    for(var i=0;i<P.length;i++){
+      var p=P[i];
+      p[0]+=spd*dt*(uL+(uR-uL)*p[0]);
+      p[1]+=spd*dt*(vB+(vT-vB)*p[1]);
+      if(p[0]<0||p[0]>1||p[1]<0||p[1]>1){ p[0]=0.15+0.7*Math.random(); p[1]=0.15+0.7*Math.random(); }
+    }
+    ctx.clearRect(0,0,W,H);
+    // cell
+    ctx.strokeStyle=col; ctx.lineWidth=2;
+    ctx.strokeRect(cx0,cy0,cw,chh);
+    ctx.fillStyle="rgba(255,255,255,.02)"; ctx.fillRect(cx0,cy0,cw,chh);
+    ctx.fillStyle="rgba(140,151,172,.9)"; ctx.font="11px sans-serif";
+    ctx.fillText("検査体積",cx0+6,cy0+16);
+    // particles
+    ctx.fillStyle="#E9EDF5";
+    for(var j=0;j<P.length;j++){
+      var X=cx0+P[j][0]*cw, Y=cy0+(1-P[j][1])*chh;
+      ctx.beginPath(); ctx.arc(X,Y,2.1,0,7); ctx.fill();
+    }
+    // 面を貫く矢印（面の中心に矢印の中点を置く）
+    var sc=55;
+    function faceArrow(fx,fy,dxv,dyv){ arrow(fx-dxv/2, fy-dyv/2, dxv, dyv, "#57C7F0"); }
+    faceArrow(cx0,      cy0+chh/2, uL*sc, 0);      // 左面
+    faceArrow(cx0+cw,   cy0+chh/2, uR*sc, 0);      // 右面
+    faceArrow(cx0+cw/2, cy0+chh,   0, -vB*sc);     // 下面（v正=上）
+    faceArrow(cx0+cw/2, cy0,       0, -vT*sc);     // 上面
+    ctx.fillStyle="rgba(140,151,172,.9)";
+    ctx.fillText("uL",cx0-46,cy0+chh/2+4);
+    ctx.fillText("uR",cx0+cw+32,cy0+chh/2+4);
+    ctx.fillText("vB",cx0+cw/2+38,cy0+chh+8);
+    ctx.fillText("vT",cx0+cw/2+38,cy0-4);
+  };
+})();
+
+/* ============================================================
+   5. レイノルズ数計算機
+============================================================ */
+(function(){
+  var sU=document.getElementById("s-U"), sL=document.getElementById("s-L"),
+      sel=document.getElementById("sel-fluid");
+  var oU=document.getElementById("o-U"), oL=document.getElementById("o-L"),
+      oNu=document.getElementById("o-nu3");
+  var reval=document.getElementById("reval"), reg=document.getElementById("reregime"),
+      marker=document.getElementById("remarker"), note=document.getElementById("renote");
+  function fmt(x,unit){
+    if(x>=100) return x.toFixed(0)+" "+unit;
+    if(x>=1) return x.toFixed(1)+" "+unit;
+    if(x>=0.01) return x.toFixed(3)+" "+unit;
+    return x.toExponential(1)+" "+unit;
+  }
+  function calc(){
+    var U=Math.pow(10,+sU.value), L=Math.pow(10,+sL.value), nu=+sel.value;
+    oU.textContent=fmt(U,"m/s"); oL.textContent=fmt(L,"m"); oNu.textContent="";
+    var Re=U*L/nu;
+    var txt;
+    if(Re>=1e4) txt=Re.toExponential(1).replace("e+","×10^");
+    else if(Re>=100) txt=Math.round(Re).toLocaleString();
+    else txt=Re.toPrecision(2);
+    reval.textContent=txt;
+    var lab,color,n;
+    if(Re<1){ lab="ストークス流（粘性が完全支配）"; color="var(--c-visc)";
+      n="慣性（対流項）が無視できる世界。微生物の遊泳やマイクロ流路。実験Iで対流バーを0にした状態。"; }
+    else if(Re<2300){ lab="層流"; color="var(--c-visc)";
+      n="粘性が流れを整えて、流線が乱れない。円管ではおよそ Re < 2300。層流予混合火炎のブンゼンバーナー内部はこのあたり。"; }
+    else if(Re<4000){ lab="遷移域"; color="var(--c-force)";
+      n="層流と乱流の間で不安定。わずかな擾乱で乱流化する敏感な領域。"; }
+    else{ lab="乱流"; color="var(--c-conv)";
+      n="対流項（非線形）が支配し、渦が渦を生む。実用燃焼器の多くはここ。乱流は混合を激しく促進するので、燃焼速度にも直結する。"; }
+    reg.textContent=lab; reg.style.color=color; note.textContent=n;
+    var lg=Math.log10(Math.max(Re,1e-2));
+    var pct=(lg-(-2))/(8-(-2))*100;
+    if(pct<0)pct=0; if(pct>100)pct=100;
+    marker.style.left=pct+"%";
+  }
+  [sU,sL,sel].forEach(function(el){ el.addEventListener("input",calc); });
+  calc();
+})();
+
+/* ============================================================
+   メインループ
+============================================================ */
+(function(){
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var frame=0;
+  function loop(){
+    frame++;
+    if(!(reduced && frame%3!==0)){
+      try{ window.__sim1d(); }catch(e){}
+      try{ window.__sim2d(); }catch(e){}
+      try{ window.__simMD(); }catch(e){}
+      try{ window.__simDiv(); }catch(e){}
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
