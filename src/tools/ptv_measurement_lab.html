@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTV (粒子追跡流速測定法) 体験ラボ</title>
+<style>
+:root{
+  --bg:#0A0E17;
+  --panel:#131B2A;
+  --panel2:#0D131E;
+  --line:rgba(140, 160, 200, 0.15);
+  --text:#E2E8F0;
+  --muted:#8B9BB4;
+  --c-p1:#00FF66;     /* t */
+  --c-p2:#33CCFF;     /* t+dt */
+  --c-track:#FF7A2E;  /* 追跡ベクトル */
+  --c-grid:#F2C14E;   /* オイラー格子補間 */
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 90px}
+header{padding:40px 0 10px}
+.eyebrow{font-size:12px;letter-spacing:0.2em;color:var(--muted);margin-bottom:10px;text-transform:uppercase;}
+h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:0.03em}
+h1 small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:8px;}
+section{margin-top:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:20px}
+.sec-num{font-family:Georgia,serif;font-style:italic;font-size:16px;color:var(--muted);}
+h2{font-size:20px;font-weight:700}
+.lead{color:var(--muted);font-size:14.5px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+canvas{display:block;width:100%;height:auto;border-radius:8px;background:var(--panel2);touch-action:none; border:1px solid var(--line)}
+
+/* ===== Equation ===== */
+.eq-stage{
+  background:linear-gradient(180deg,#131B2A 0%,#0D131E 100%);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 20px 25px;margin-top:20px; text-align:center;
+}
+.equation{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:12px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(22px,4.5vw,32px);
+}
+.frac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.2;font-size:0.9em}
+.frac .bar{width:100%;height:2px;background:currentColor;margin:4px 0;}
+.eq-desc{margin-top:20px;font-size:14px;color:#C6CEDD;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;}
+.eq-desc div{background:rgba(255,255,255,0.03); padding:8px 16px; border-radius:6px; border:1px solid var(--line);}
+
+/* ===== Controls ===== */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px;margin-top:20px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+.ctl label b{color:var(--text);font-weight:600}
+.ctl output{font-family:Georgia,serif;font-style:italic;color:var(--text)}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:5px;border-radius:3px;
+  background:#23304A;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--thumb,#fff);border:2px solid #0A0E17;cursor:pointer;
+}
+.ctl.dens{--thumb:var(--c-p1)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+button{
+  background:#1C263A;border:1px solid var(--line);color:var(--text);
+  padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+  transition:background 0.2s; font-weight:600;
+}
+button:hover{background:#283652}
+button.primary{background:rgba(255, 122, 46, 0.1); border-color:var(--c-track); color:var(--c-track);}
+button.primary:hover{background:rgba(255, 122, 46, 0.2);}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* UI Badges */
+.status-badge{
+  padding:12px; border-radius:8px; margin-top:10px;
+  font-size:13.5px; transition:all 0.3s;
+  border:1px solid transparent; display:flex; justify-content:space-between; align-items:center;
+}
+.st-good{background:rgba(0,255,102,0.1); color:#00FF66; border-color:rgba(0,255,102,0.3);}
+.st-err{background:rgba(255,51,102,0.1); color:#FF3366; border-color:rgba(255,51,102,0.3);}
+
+/* Options */
+.radio-group{display:flex; gap:10px;}
+.radio-group label{
+  background:#1C263A; border:1px solid var(--line); padding:6px 12px; border-radius:6px;
+  font-size:13px; cursor:pointer; transition:all 0.2s; color:var(--muted);
+}
+.radio-group input[type="radio"] { display:none; }
+.radio-group input[type="radio"]:checked + label {
+  background:rgba(242, 193, 78, 0.1); border-color:var(--c-grid); color:var(--c-grid);
+}
+
+footer{margin-top:50px;border-top:1px solid var(--line);padding:20px 0;font-size:12px;color:var(--muted);text-align:center}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">YAHAGI ZOO / 実験・解析ツール</div>
+  <h1>PTV (粒子追跡流速測定法) 体験ラボ
+    <small>集団(PIV)ではなく「個」を追う。ラグランジュ的アプローチによる流速測定</small>
+  </h1>
+</header>
+
+<div class="eq-stage">
+  <div class="equation">
+    <span style="color:var(--c-track)">粒子速度 <i>v<sub>i</sub></i></span>
+    <span style="color:var(--muted)">=</span>
+    <span class="frac">
+      <span><i>x<sub>i</sub></i> (t + Δt) − <i>x<sub>i</sub></i> (t)</span>
+      <span class="bar" style="background:var(--muted)"></span>
+      <span>Δt</span>
+    </span>
+  </div>
+  <div class="eq-desc">
+    <div><b>PIV (オイラー的)</b>：検査領域（窓）内の「平均的な集団の移動」を相互相関で求める</div>
+    <div><b style="color:var(--c-track)">PTV (ラグランジュ的)</b>：個々の粒子 $i$ を特定し、その「軌跡（移動量）」から速度を求める</div>
+  </div>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 I</span><h2>粒子マッチングの限界 — PIVと逆のトレードオフ</h2></div>
+  <p class="lead">PTVでは、画像1の粒子Aが、画像2のどの粒子に移動したかを探す「マッチング（追跡）」を行います（ここでは最近接探索法を使用）。シード密度が低ければ確実に追跡できますが、密度を上げすぎると「別の粒子を同一粒子と誤認」するエラー（ミスマッチ）が多発します。</p>
+  
+  <div class="panel grid2">
+    <div>
+      <div style="position:relative; width:100%; aspect-ratio:1/1;">
+        <canvas id="cv1d" width="400" height="400" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; justify-content:center;">
+      <div class="controls" style="grid-template-columns:1fr; margin-top:0">
+        <div class="ctl dens">
+          <label><b>シード粒子密度 (Particles)</b> <output id="o-dens">50 (低密度)</output></label>
+          <input type="range" id="s-dens" min="10" max="400" step="10" value="50">
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button class="primary" id="b-track1" style="width:100%; padding:14px; font-size:15px">🎯 撮影して粒子を追跡 (Track)</button>
+      </div>
+
+      <div class="status-badge st-good" id="status-1">
+        <span><b>マッチング成功率:</b></span>
+        <span id="st1-val" style="font-family:Georgia; font-size:18px;">100 %</span>
+      </div>
+
+      <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; margin-top:20px;">
+        <b>エンジン工学とのリンク:</b><br>
+        PIVは粒子が密でないとエラーになりますが、PTVは粒子が密すぎるとエラーになります（赤いベクトルがミスマッチ）。<br>
+        PTVは、燃料噴霧の液滴(Droplet)追跡や、壁面近傍などシード密度を上げられない局所領域の解析で威力を発揮します。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 II</span><h2>ラグランジュ軌跡からオイラー格子への変換</h2></div>
+  <p class="lead">PTVで得られるベクトルは「粒子が存在した場所」に散在しており、そのままでは空間の速度勾配や渦度（∇×v）を計算できません。そのため、散乱ベクトルから規則正しい格子点（Grid）への補間（Interpolation）を行うのが一般的なプロセスです。管内流（ポアズイユ流）で試してみましょう。</p>
+  
+  <div class="panel">
+    <div class="grid2" style="grid-template-columns: 1.2fr 0.8fr;">
+      <div>
+        <canvas id="cv2d" width="500" height="300" style="max-width:100%; aspect-ratio:5/3"></canvas>
+      </div>
+      <div style="display:flex; flex-direction:column; justify-content:space-between;">
+        
+        <div>
+          <label style="font-size:13px; color:var(--muted); display:block; margin-bottom:8px;"><b>表示モードの切り替え</b></label>
+          <div class="radio-group" style="flex-direction:column;" id="rg-view">
+            <input type="radio" id="v-raw" name="viewmode" value="raw" checked>
+            <label for="v-raw" style="color:var(--c-track); border-color:rgba(255,122,46,0.3)">
+              <b>1. 散乱ベクトル (Raw PTV Vectors)</b><br>
+              <span style="font-size:11px; color:var(--muted)">粒子が存在する位置のみベクトルが算出される（ランダム配置）</span>
+            </label>
+            
+            <input type="radio" id="v-grid" name="viewmode" value="grid">
+            <label for="v-grid" style="color:var(--c-grid); border-color:rgba(242,193,78,0.3)">
+              <b>2. 格子補間 (Interpolated Eulerian Grid)</b><br>
+              <span style="font-size:11px; color:var(--muted)">周囲のPTVベクトルを逆距離加重(IDW)で補間し、等間隔メッシュを作成</span>
+            </label>
+          </div>
+          
+          <div class="btnrow" style="margin-top:20px">
+             <button id="b-flow-toggle" style="width:100%; padding:10px;">⏸ 流れを一時停止</button>
+          </div>
+        </div>
+
+        <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; margin-top:20px;">
+          <b>データ構造の違い:</b><br>
+          PTVは流体の「個々の粒子の歴史」を知るのに適していますが、そのままではナビエ・ストークス方程式のような「オイラー的」な空間微分が使えません。解析目的によってPIVとPTV（または補間処理）を使い分けます。
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  YAHAGI ZOO / 流体・燃焼工学 教育ツール<br>
+  (※ このデモは教育用に最近接探索法(Nearest Neighbor)と逆距離加重補間(IDW)を簡易実装したものです)
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   共通ユーティリティ
+============================================================ */
+function drawParticle(ctx, x, y, color, size=2) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawArrow(ctx, fromX, fromY, toX, toY, color) {
+  const headlen = 7;
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const angle = Math.atan2(dy, dx);
+  
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+  
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* ============================================================
+   実験1: PTVマッチング (Nearest Neighbor)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv1d");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  
+  const sDens = document.getElementById("s-dens");
+  const oDens = document.getElementById("o-dens");
+  const statusEl = document.getElementById("status-1");
+  const stVal = document.getElementById("st1-val");
+  
+  let particles = [];
+  let frame1 = [];
+  let frame2 = [];
+  let trackedPairs = [];
+  let isCaptured = false;
+  
+  // 渦流れ場
+  const vortexX = W/2, vortexY = H/2;
+  function getVortexVel(x, y) {
+    let dx = x - vortexX;
+    let dy = y - vortexY;
+    let r = Math.sqrt(dx*dx + dy*dy);
+    if(r === 0) return {u:0, v:0};
+    let vel = 1500 / (r + 30); // Rankine-like
+    return { u: -vel * (dy/r), v: vel * (dx/r) };
+  }
+
+  function initParticles() {
+    let N = parseInt(sDens.value);
+    particles = [];
+    for(let i=0; i<N; i++) {
+      particles.push({ id: i, x: Math.random() * W, y: Math.random() * H });
+    }
+  }
+  initParticles();
+
+  sDens.addEventListener("input", () => {
+    let n = parseInt(sDens.value);
+    if(n < 100) oDens.textContent = n + " (低密度・安全)";
+    else if(n < 250) oDens.textContent = n + " (中密度・注意)";
+    else oDens.textContent = n + " (高密度・エラー増)";
+    initParticles();
+    isCaptured = false;
+  });
+
+  document.getElementById("b-track1").addEventListener("click", () => {
+    // 撮影
+    let dt = 0.5;
+    frame1 = particles.map(p => ({id: p.id, x: p.x, y: p.y}));
+    frame2 = particles.map(p => {
+      let v = getVortexVel(p.x, p.y);
+      return {
+        id: p.id,
+        x: p.x + v.u * dt,
+        y: p.y + v.v * dt
+      };
+    });
+    
+    // Nearest Neighbor Tracking Algorithm
+    trackedPairs = [];
+    let correct = 0;
+    
+    for(let p1 of frame1) {
+      let minDist = Infinity;
+      let matchedP2 = null;
+      
+      for(let p2 of frame2) {
+        let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        // 一定距離以上は検索打ち切り (Search radius)
+        if (dist < 40 && dist < minDist) {
+          minDist = dist;
+          matchedP2 = p2;
+        }
+      }
+      
+      if (matchedP2) {
+        let isCorrect = (p1.id === matchedP2.id);
+        if (isCorrect) correct++;
+        trackedPairs.push({ p1: p1, p2: matchedP2, correct: isCorrect });
+      }
+    }
+    
+    isCaptured = true;
+    
+    // Status update
+    let rate = (correct / frame1.length) * 100;
+    stVal.textContent = rate.toFixed(1) + " %";
+    if (rate > 95) {
+      statusEl.className = "status-badge st-good";
+    } else {
+      statusEl.className = "status-badge st-err";
+    }
+
+    // Auto reset
+    setTimeout(() => {
+      isCaptured = false;
+    }, 4000);
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    
+    ctx.strokeStyle = "rgba(140, 160, 200, 0.1)";
+    ctx.lineWidth = 1;
+    for(let i=0; i<W; i+=20) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke();
+    }
+
+    if (!isCaptured) {
+      // Live flowing particles
+      for(let p of particles) {
+        let v = getVortexVel(p.x, p.y);
+        p.x += v.u * 0.05;
+        p.y += v.v * 0.05;
+        if(p.x > W) p.x -= W; if(p.x < 0) p.x += W;
+        if(p.y > H) p.y -= H; if(p.y < 0) p.y += H;
+        drawParticle(ctx, p.x, p.y, "rgba(255,255,255,0.7)", 2.5);
+      }
+    } else {
+      // Show Frame 1 & 2
+      for(let p of frame1) drawParticle(ctx, p.x, p.y, "var(--c-p1)", 2.5);
+      for(let p of frame2) drawParticle(ctx, p.x, p.y, "var(--c-p2)", 2.5);
+      
+      // Draw matched vectors
+      for(let pair of trackedPairs) {
+        let color = pair.correct ? "var(--c-track)" : "#FF3366"; // 成功オレンジ、失敗レッド
+        drawArrow(ctx, pair.p1.x, pair.p1.y, pair.p2.x, pair.p2.y, color);
+      }
+      
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "12px sans-serif";
+      ctx.fillText("■ t (フレーム1)", 10, 20);
+      ctx.fillStyle = "var(--c-p2)";
+      ctx.fillText("■ t+dt (フレーム2)", 10, 35);
+      ctx.fillStyle = "#FF3366";
+      ctx.fillText("↗ ミスマッチベクトル", 10, 50);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ============================================================
+   実験2: PTV軌跡 → 格子補間 (IDW Interpolation)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv2d");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  
+  let particles = [];
+  const N = 120; // 中程度の密度
+  let isFlowing = true;
+  
+  // 管内流 (Poiseuille flow)
+  function getPipeVel(y) {
+    let r = y - H/2;
+    let R = H/2 - 20; // 管半径
+    if (Math.abs(r) >= R) return {u: 0, v: 0};
+    let uMax = 4.0;
+    let u = uMax * (1 - (r*r)/(R*R));
+    return {u: u, v: 0};
+  }
+
+  for(let i=0; i<N; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: (H/2 - 20) + (Math.random()*2 - 1)*(H/2 - 21) // 管内に配置
+    });
+  }
+
+  document.getElementById("b-flow-toggle").addEventListener("click", (e) => {
+    isFlowing = !isFlowing;
+    e.target.textContent = isFlowing ? "⏸ 流れを一時停止" : "▶ 流れを再開";
+  });
+
+  const radios = document.getElementsByName("viewmode");
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    
+    // Draw Pipe Walls
+    ctx.fillStyle = "#1C263A";
+    ctx.fillRect(0, 0, W, 20);
+    ctx.fillRect(0, H-20, W, 20);
+    ctx.strokeStyle = "rgba(140, 160, 200, 0.5)";
+    ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(W, 20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, H-20); ctx.lineTo(W, H-20); ctx.stroke();
+
+    // Move particles
+    if (isFlowing) {
+      for(let p of particles) {
+        let v = getPipeVel(p.y);
+        p.x += v.u * 0.5;
+        // add slight noise for realism
+        p.y += (Math.random()-0.5)*0.5;
+        if(p.x > W) { p.x = 0; p.y = (H/2 - 20) + (Math.random()*2 - 1)*(H/2 - 21); }
+      }
+    }
+
+    let mode = "raw";
+    for(let r of radios) { if(r.checked) mode = r.value; }
+
+    // 1. Raw PTV Vectors
+    if (mode === "raw") {
+      for(let p of particles) {
+        drawParticle(ctx, p.x, p.y, "rgba(255, 122, 46, 0.5)", 2);
+        let v = getPipeVel(p.y); // 本来は前後のフレームから計算するが、デモなので理論値を使用
+        // draw vector exactly at particle position (scattered)
+        drawArrow(ctx, p.x, p.y, p.x + v.u * 5, p.y + v.v * 5, "var(--c-track)");
+      }
+    } 
+    // 2. Grid Interpolated Vectors (IDW)
+    else if (mode === "grid") {
+      let gridSize = 30;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      
+      // Inverse Distance Weighting (IDW)
+      for(let gy = 20 + gridSize/2; gy < H-20; gy += gridSize) {
+        for(let gx = gridSize/2; gx < W; gx += gridSize) {
+          // Draw Grid Dot
+          ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI*2); ctx.fillStyle="rgba(255,255,255,0.2)"; ctx.fill();
+          
+          let sumU = 0, sumV = 0, sumW = 0;
+          let rMax = 40; // 影響半径
+          
+          for(let p of particles) {
+            let dist = Math.hypot(p.x - gx, p.y - gy);
+            if (dist < rMax && dist > 0) {
+              let weight = 1.0 / (dist * dist); // 逆距離の2乗加重
+              let pv = getPipeVel(p.y);
+              sumU += pv.u * weight;
+              sumV += pv.v * weight;
+              sumW += weight;
+            }
+          }
+          
+          if (sumW > 0) {
+            let uGrid = sumU / sumW;
+            let vGrid = sumV / sumW;
+            drawArrow(ctx, gx, gy, gx + uGrid * 5, gy + vGrid * 5, "var(--c-grid)");
+          }
+        }
+      }
+      // Ghost particles in background
+      for(let p of particles) drawParticle(ctx, p.x, p.y, "rgba(255,255,255,0.15)", 1.5);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

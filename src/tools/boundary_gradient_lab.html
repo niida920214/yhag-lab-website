@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>予混合火炎の境界速度勾配理論 体験ラボ</title>
+<style>
+:root{
+  --bg:#0A0E17;
+  --panel:#131B2A;
+  --panel2:#0D131E;
+  --line:rgba(140, 160, 200, 0.15);
+  --text:#E2E8F0;
+  --muted:#8B9BB4;
+  --c-flow:#57C7F0;   /* 流速 U */
+  --c-burn:#FF5A00;   /* 燃焼速度 SL */
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 90px}
+header{padding:40px 0 10px}
+.eyebrow{font-size:12px;letter-spacing:0.2em;color:var(--muted);margin-bottom:10px;text-transform:uppercase;}
+h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:0.03em}
+h1 small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:8px;}
+section{margin-top:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:20px}
+.sec-num{font-family:Georgia,serif;font-style:italic;font-size:16px;color:var(--muted);}
+h2{font-size:20px;font-weight:700}
+.lead{color:var(--muted);font-size:14.5px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+canvas{display:block;width:100%;height:auto;border-radius:8px;background:var(--panel2);touch-action:none; border:1px solid var(--line)}
+
+/* ===== Equation ===== */
+.eq-stage{
+  background:linear-gradient(180deg,#131B2A 0%,#0D131E 100%);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 20px 25px;margin-top:20px; text-align:center;
+}
+.equation{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:12px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(22px,4.5vw,32px);
+}
+.frac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.2;font-size:0.9em}
+.frac .bar{width:100%;height:2px;background:currentColor;margin:4px 0;}
+.eq-desc{margin-top:20px;font-size:14px;color:#C6CEDD;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;}
+.eq-desc div{background:rgba(255,255,255,0.03); padding:8px 16px; border-radius:6px; border:1px solid var(--line);}
+
+/* ===== Controls ===== */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px;margin-top:20px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+.ctl label b{color:var(--text);font-weight:600}
+.ctl output{font-family:Georgia,serif;font-style:italic;color:var(--text)}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:5px;border-radius:3px;
+  background:#23304A;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--thumb,#fff);border:2px solid #0A0E17;cursor:pointer;
+}
+.ctl.flow{--thumb:var(--c-flow)} .ctl.burn{--thumb:var(--c-burn)}
+
+.grid2{display:grid;grid-template-columns:1.1fr 0.9fr;gap:24px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* Status Badge */
+.status-badge{
+  padding:16px; border-radius:8px; margin-top:15px; text-align:center;
+  font-size:18px; font-weight:bold; letter-spacing:0.05em; transition:all 0.3s;
+  border:1px solid transparent;
+}
+.st-stable{background:rgba(87,199,240,0.1); color:#57C7F0; border-color:rgba(87,199,240,0.3);}
+.st-blowoff{background:rgba(140,151,172,0.1); color:#C6CEDD; border-color:rgba(140,151,172,0.3);}
+.st-flashback{background:rgba(255,90,0,0.15); color:#FF7A2E; border-color:rgba(255,90,0,0.3); box-shadow:0 0 15px rgba(255,90,0,0.1);}
+
+footer{margin-top:50px;border-top:1px solid var(--line);padding:20px 0;font-size:12px;color:var(--muted);text-align:center}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">YAHAGI ZOO / 教育ツール</div>
+  <h1>予混合火炎の境界速度勾配理論
+    <small>ルイス・フォン・エルベ (Lewis and von Elbe) の理論に基づく、吹き飛びと逆火のメカニズム</small>
+  </h1>
+</header>
+
+<div class="eq-stage">
+  <div class="equation">
+    <span>境界速度勾配 <i>g</i></span>
+    <span style="color:var(--muted)">=</span>
+    <span class="frac">
+      <span style="color:var(--c-flow)">d<i>U</i></span>
+      <span class="bar" style="background:var(--muted)"></span>
+      <span style="color:var(--muted)">d<i>y</i></span>
+    </span>
+  </div>
+  <div class="eq-desc">
+    <div><b style="color:#C6CEDD">g > g<sub>B</sub></b> : 流速が速すぎる → <b>吹き飛び (Blow-off)</b></div>
+    <div><b style="color:#57C7F0">g<sub>F</sub> ≤ g ≤ g<sub>B</sub></b> : 釣り合っている → <b>安定 (Stable)</b></div>
+    <div><b style="color:#FF7A2E">g < g<sub>F</sub></b> : 燃焼速度が勝る → <b>逆火 (Flash-back)</b></div>
+  </div>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 I</span><h2>壁面近傍の速度プロファイルと火炎の安定性</h2></div>
+  <p class="lead">バーナー壁面からの距離 $y$ に対する、未燃ガスの流速 $U$ と層流燃焼速度 $S_L$ の関係です。壁面近傍では熱損失により $S_L$ が低下し（消炎距離）、同時に流速 $U$ もゼロに近づきます。この2つの曲線の交点が「火炎の基部（アンカー）」となります。</p>
+  
+  <div class="panel grid2">
+    <div>
+      <canvas id="cv1d" width="500" height="350"></canvas>
+    </div>
+    <div style="display:flex; flex-direction:column; justify-content:space-between;">
+      <div class="controls" style="grid-template-columns:1fr; margin-top:0">
+        <div class="ctl flow">
+          <label><b style="color:var(--c-flow)">未燃ガス流量 (境界速度勾配 g)</b> <output id="o-g">25</output></label>
+          <input type="range" id="s-g" min="5" max="80" step="1" value="25">
+        </div>
+        <div class="ctl burn">
+          <label><b style="color:var(--c-burn)">混合気の燃えやすさ (当量比・温度等)</b> <output id="o-phi">標準</output></label>
+          <input type="range" id="s-phi" min="0.5" max="1.5" step="0.05" value="1.0">
+        </div>
+      </div>
+
+      <div class="status-badge st-stable" id="status-text">
+        🔥 安定燃焼 (Stable)
+      </div>
+
+      <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; margin-top:15px;">
+        <b>観察ポイント：</b><br>
+        ① 流量(g)を上げる: 青い直線が急傾斜になり、オレンジの曲線($S_L$)と交わらなくなると「吹き飛び」になります。<br>
+        ② 流量(g)を下げる: 青い直線が寝ていき、壁面付近でオレンジの曲線が青い直線を上回る（$S_L > U$）と、管の中に火が逆流する「逆火」になります。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 II</span><h2>ブンゼンバーナー火炎の挙動 (2D可視化)</h2></div>
+  <p class="lead">実験Iのパラメータに連動して、実際のブンゼン火炎がどのように振る舞うかをシミュレートします。</p>
+  <div class="panel" style="display:flex; justify-content:center;">
+    <canvas id="cv2d" width="400" height="400" style="max-width:100%; border:none; background:transparent;"></canvas>
+  </div>
+</section>
+
+<footer>
+  YAHAGI ZOO / 流体・燃焼工学 教育ツール<br>
+  (※ このデモは教育用として、Lewis and von Elbe の概念図をインタラクティブに再現したものです)
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+(function(){
+  // --- UI Elements ---
+  const sG = document.getElementById("s-g");
+  const sPhi = document.getElementById("s-phi");
+  const oG = document.getElementById("o-g");
+  const oPhi = document.getElementById("o-phi");
+  const statusBadge = document.getElementById("status-text");
+
+  // --- Canvases ---
+  const cv1 = document.getElementById("cv1d");
+  const ctx1 = cv1.getContext("2d");
+  const cv2 = document.getElementById("cv2d");
+  const ctx2 = cv2.getContext("2d");
+
+  // --- State Variables ---
+  let currentState = "stable"; // "stable", "blowoff", "flashback"
+  let flameHeight = 0;
+  let flashBackDepth = 0;
+  let blowOffHeight = 0;
+
+  function updateParams() {
+    let g = parseFloat(sG.value);
+    let phi = parseFloat(sPhi.value);
+    
+    oG.textContent = g.toFixed(0);
+    if(phi < 0.8) oPhi.textContent = "希薄 (Lean)";
+    else if(phi > 1.2) oPhi.textContent = "過濃 (Rich)";
+    else oPhi.textContent = "標準 (Stoic)";
+
+    // SL curve parameters
+    // 消炎距離 dq は phi が1から離れるほど大きくなる
+    let dq = 0.5 + Math.abs(phi - 1.0) * 2.0; 
+    let SL_max = 50 * Math.max(0.2, 1.0 - Math.pow(Math.abs(phi - 1.0)*1.5, 2)); 
+
+    // check limits
+    let isBlowOff = true;
+    let isFlashBack = false;
+    let anchorY = 0;
+
+    // Check U(y) vs SL(y)
+    // 0 から 5 までの区間で判定
+    for(let y = 0.01; y <= 5.0; y += 0.05) {
+      let sl = y <= dq ? 0 : SL_max * (1.0 - Math.exp(-(y - dq)*2.0));
+      let u = g * y;
+
+      if (sl > u) {
+        // もし壁面近傍 (y が小さい領域) で SL > U となったら逆火
+        // ただし、交点が一つもない（常に U > SL）かどうかも見る
+        isFlashBack = true;
+      }
+      
+      if (sl >= u) {
+        isBlowOff = false; // 一箇所でもSLがUを上回る・並ぶなら吹き飛ばない
+        if(anchorY === 0) anchorY = y; // 最初の交点
+      }
+    }
+
+    // Determine State
+    if (isBlowOff) {
+      currentState = "blowoff";
+      statusBadge.className = "status-badge st-blowoff";
+      statusBadge.textContent = "💨 吹き飛び (Blow-off)";
+    } else if (isFlashBack) {
+      currentState = "flashback";
+      statusBadge.className = "status-badge st-flashback";
+      statusBadge.textContent = "💥 逆火 (Flash-back)";
+    } else {
+      currentState = "stable";
+      statusBadge.className = "status-badge st-stable";
+      statusBadge.textContent = "🔥 安定燃焼 (Stable)";
+    }
+
+    return { g, phi, dq, SL_max };
+  }
+
+  // --- Graph 1 (Velocity Profiles) ---
+  function drawGraph1(p) {
+    const W = cv1.width, H = cv1.height;
+    ctx1.clearRect(0,0,W,H);
+
+    const marginL = 50, marginB = 40, marginT = 20, marginR = 20;
+    const plotW = W - marginL - marginR;
+    const plotH = H - marginB - marginT;
+
+    // Axes
+    ctx1.strokeStyle = "rgba(140, 160, 200, 0.3)";
+    ctx1.lineWidth = 2;
+    ctx1.beginPath();
+    ctx1.moveTo(marginL, marginT); ctx1.lineTo(marginL, H - marginB); // Y axis
+    ctx1.lineTo(W - marginR, H - marginB); // X axis
+    ctx1.stroke();
+
+    ctx1.fillStyle = "var(--muted)";
+    ctx1.font = "12px sans-serif";
+    ctx1.textAlign = "center";
+    ctx1.fillText("壁面からの距離 y", marginL + plotW/2, H - 10);
+    
+    ctx1.save();
+    ctx1.translate(15, marginT + plotH/2);
+    ctx1.rotate(-Math.PI/2);
+    ctx1.fillText("速度 (Velocity)", 0, 0);
+    ctx1.restore();
+    
+    // Fill Wall region
+    ctx1.fillStyle = "rgba(255,255,255,0.02)";
+    ctx1.fillRect(0, marginT, marginL, plotH);
+    ctx1.fillStyle = "var(--muted)";
+    ctx1.textAlign = "right";
+    ctx1.fillText("Burner", marginL-5, marginT + 20);
+    ctx1.fillText("Wall", marginL-5, marginT + 35);
+
+    // Scale
+    const yMax = 5.0; // Distance max
+    const vMax = 200; // Velocity max
+
+    function getX(y) { return marginL + (y / yMax) * plotW; }
+    function getY(v) { return (H - marginB) - (v / vMax) * plotH; }
+
+    // Draw S_L curve (Orange)
+    ctx1.beginPath();
+    ctx1.moveTo(getX(0), getY(0));
+    for(let y = 0; y <= yMax; y += 0.05) {
+      let sl = y <= p.dq ? 0 : p.SL_max * (1.0 - Math.exp(-(y - p.dq)*2.0));
+      ctx1.lineTo(getX(y), getY(sl));
+    }
+    ctx1.strokeStyle = "var(--c-burn)";
+    ctx1.lineWidth = 3;
+    ctx1.stroke();
+    ctx1.fillStyle = "var(--c-burn)";
+    ctx1.textAlign = "left";
+    ctx1.fillText("S_L (燃焼速度)", getX(3), getY(p.SL_max) - 10);
+
+    // Draw U curve (Blue, U = g*y)
+    ctx1.beginPath();
+    ctx1.moveTo(getX(0), getY(0));
+    for(let y = 0; y <= yMax; y += 0.5) {
+      let u = p.g * y;
+      ctx1.lineTo(getX(y), getY(u));
+    }
+    ctx1.strokeStyle = "var(--c-flow)";
+    ctx1.lineWidth = 3;
+    ctx1.stroke();
+    ctx1.fillStyle = "var(--c-flow)";
+    ctx1.fillText("U (流速)", getX(3), getY(p.g * 3) - 10);
+    
+    // Draw Quenching Distance Area
+    ctx1.fillStyle = "rgba(255, 90, 0, 0.1)";
+    ctx1.fillRect(getX(0), marginT, getX(p.dq) - getX(0), plotH);
+    if(p.dq > 0.1) {
+      ctx1.fillStyle = "rgba(255, 90, 0, 0.6)";
+      ctx1.textAlign = "center";
+      ctx1.fillText("消炎距離", getX(p.dq/2), H - marginB - 10);
+    }
+  }
+
+  // --- Graph 2 (Bunsen Burner 2D) ---
+  function drawGraph2(p) {
+    const W = cv2.width, H = cv2.height;
+    ctx2.clearRect(0,0,W,H);
+
+    const cx = W / 2;
+    const by = H - 50; // Burner top Y
+    const bw = 60; // Burner half width
+
+    // Animation variables
+    if (currentState === "stable") {
+      flameHeight += (p.g * 1.5 - flameHeight) * 0.1; // 流量に応じて炎が高くなる
+      flashBackDepth *= 0.8;
+      blowOffHeight *= 0.8;
+    } else if (currentState === "flashback") {
+      flashBackDepth += (150 - flashBackDepth) * 0.1; // 炎が下がる
+      flameHeight *= 0.8;
+      blowOffHeight *= 0.8;
+    } else if (currentState === "blowoff") {
+      blowOffHeight += (H - blowOffHeight) * 0.05; // 炎が上へ逃げる
+      flameHeight *= 0.9;
+    }
+
+    // Draw unburned gas (Particles/Lines)
+    ctx2.strokeStyle = "rgba(87, 199, 240, 0.2)";
+    ctx2.lineWidth = 2;
+    let flowSpeed = p.g * 0.2;
+    let time = Date.now() / 1000;
+    for(let i = -bw+10; i <= bw-10; i+=15) {
+      let lineY = (time * flowSpeed * 20 + i*13) % 100;
+      ctx2.beginPath();
+      ctx2.moveTo(cx + i, by + 50 - lineY);
+      ctx2.lineTo(cx + i, by + 30 - lineY);
+      ctx2.stroke();
+    }
+
+    // Draw Burner Tube
+    ctx2.fillStyle = "#1C263A";
+    ctx2.fillRect(cx - bw - 10, by, 10, H - by); // Left wall
+    ctx2.fillRect(cx + bw, by, 10, H - by);      // Right wall
+    
+    // Draw Flame
+    ctx2.save();
+    
+    if (currentState === "stable") {
+      ctx2.translate(0, -blowOffHeight); // Usually 0
+      ctx2.beginPath();
+      ctx2.moveTo(cx - bw + p.dq*10, by); // Anchor left (shifted by quenching distance)
+      ctx2.lineTo(cx, by - flameHeight - 30); // Peak
+      ctx2.lineTo(cx + bw - p.dq*10, by); // Anchor right
+      
+      // Outer flame
+      ctx2.strokeStyle = "rgba(87, 199, 240, 0.8)";
+      ctx2.lineWidth = 3;
+      ctx2.stroke();
+      
+      // Inner flame glow
+      ctx2.fillStyle = "rgba(87, 199, 240, 0.15)";
+      ctx2.fill();
+      
+      // Anchor dots
+      ctx2.fillStyle = "var(--c-burn)";
+      ctx2.beginPath(); ctx2.arc(cx - bw + p.dq*10, by, 4, 0, Math.PI*2); ctx2.fill();
+      ctx2.beginPath(); ctx2.arc(cx + bw - p.dq*10, by, 4, 0, Math.PI*2); ctx2.fill();
+
+    } else if (currentState === "flashback") {
+      ctx2.beginPath();
+      // Inverted V shape moving down
+      ctx2.moveTo(cx - bw + p.dq*10, by + flashBackDepth); 
+      ctx2.lineTo(cx, by + flashBackDepth + 30); 
+      ctx2.lineTo(cx + bw - p.dq*10, by + flashBackDepth); 
+      
+      ctx2.strokeStyle = "rgba(255, 90, 0, 0.9)";
+      ctx2.lineWidth = 4;
+      ctx2.stroke();
+      ctx2.fillStyle = "rgba(255, 90, 0, 0.3)";
+      ctx2.fill();
+      
+    } else if (currentState === "blowoff") {
+      ctx2.globalAlpha = Math.max(0, 1.0 - blowOffHeight/200);
+      ctx2.beginPath();
+      // Lifted detached flame
+      ctx2.moveTo(cx - bw/2, by - blowOffHeight); 
+      ctx2.lineTo(cx, by - blowOffHeight - 50); 
+      ctx2.lineTo(cx + bw/2, by - blowOffHeight); 
+      
+      ctx2.strokeStyle = "rgba(140, 151, 172, 0.8)";
+      ctx2.lineWidth = 3;
+      ctx2.stroke();
+    }
+    
+    ctx2.restore();
+  }
+
+  // --- Main Loop ---
+  function loop() {
+    let p = updateParams();
+    drawGraph1(p);
+    drawGraph2(p);
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+})();
+</script>
+</body>
+</html>

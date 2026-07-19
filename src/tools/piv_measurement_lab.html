@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIV (粒子画像流速測定法) 体験ラボ</title>
+<style>
+:root{
+  --bg:#0A0E17;
+  --panel:#131B2A;
+  --panel2:#0D131E;
+  --line:rgba(140, 160, 200, 0.15);
+  --text:#E2E8F0;
+  --muted:#8B9BB4;
+  --c-laser:#00FF66;  /* レーザーシート */
+  --c-f1:#FF3366;     /* フレーム1 */
+  --c-f2:#33CCFF;     /* フレーム2 */
+  --c-vec:#F2C14E;    /* ベクトル */
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 90px}
+header{padding:40px 0 10px}
+.eyebrow{font-size:12px;letter-spacing:0.2em;color:var(--muted);margin-bottom:10px;text-transform:uppercase;}
+h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:0.03em}
+h1 small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:8px;}
+section{margin-top:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:20px}
+.sec-num{font-family:Georgia,serif;font-style:italic;font-size:16px;color:var(--muted);}
+h2{font-size:20px;font-weight:700}
+.lead{color:var(--muted);font-size:14.5px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+canvas{display:block;width:100%;height:auto;border-radius:8px;background:var(--panel2);touch-action:none; border:1px solid var(--line)}
+
+/* ===== Equation ===== */
+.eq-stage{
+  background:linear-gradient(180deg,#131B2A 0%,#0D131E 100%);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 20px 25px;margin-top:20px; text-align:center;
+}
+.equation{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:12px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(22px,4.5vw,32px);
+}
+.frac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.2;font-size:0.9em}
+.frac .bar{width:100%;height:2px;background:currentColor;margin:4px 0;}
+.eq-desc{margin-top:20px;font-size:14px;color:#C6CEDD;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;}
+.eq-desc div{background:rgba(255,255,255,0.03); padding:8px 16px; border-radius:6px; border:1px solid var(--line);}
+
+/* ===== Controls ===== */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px;margin-top:20px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+.ctl label b{color:var(--text);font-weight:600}
+.ctl output{font-family:Georgia,serif;font-style:italic;color:var(--text)}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:5px;border-radius:3px;
+  background:#23304A;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--thumb,#fff);border:2px solid #0A0E17;cursor:pointer;
+}
+.ctl.time{--thumb:var(--c-vec)} .ctl.seed{--thumb:var(--c-laser)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+button{
+  background:#1C263A;border:1px solid var(--line);color:var(--text);
+  padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+  transition:background 0.2s; font-weight:600;
+}
+button:hover{background:#283652}
+button.primary{background:rgba(0, 255, 102, 0.1); border-color:var(--c-laser); color:var(--c-laser);}
+button.primary:hover{background:rgba(0, 255, 102, 0.2);}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* UI Badges */
+.status-badge{
+  padding:12px; border-radius:8px; margin-top:10px;
+  font-size:13.5px; transition:all 0.3s;
+  border:1px solid transparent; display:flex; justify-content:space-between; align-items:center;
+}
+.st-good{background:rgba(0,255,102,0.1); color:#00FF66; border-color:rgba(0,255,102,0.3);}
+.st-warn{background:rgba(242,193,78,0.1); color:#F2C14E; border-color:rgba(242,193,78,0.3);}
+.st-err{background:rgba(255,51,102,0.1); color:#FF3366; border-color:rgba(255,51,102,0.3);}
+
+/* Options */
+.radio-group{display:flex; gap:10px;}
+.radio-group label{
+  background:#1C263A; border:1px solid var(--line); padding:6px 12px; border-radius:6px;
+  font-size:13px; cursor:pointer; transition:all 0.2s; color:var(--muted);
+}
+.radio-group input[type="radio"] { display:none; }
+.radio-group input[type="radio"]:checked + label {
+  background:rgba(0,255,102,0.1); border-color:var(--c-laser); color:var(--c-laser);
+}
+
+footer{margin-top:50px;border-top:1px solid var(--line);padding:20px 0;font-size:12px;color:var(--muted);text-align:center}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">YAHAGI ZOO / 実験・解析ツール</div>
+  <h1>PIV (粒子画像流速測定法) 体験ラボ
+    <small>見えない流れを可視化する。レーザーと相互相関による流速ベクトル解析の原理</small>
+  </h1>
+</header>
+
+<div class="eq-stage">
+  <div class="equation">
+    <span style="color:var(--c-vec)">速度ベクトル <i>V</i></span>
+    <span style="color:var(--muted)">=</span>
+    <span class="frac">
+      <span>粒子の移動量 <i>Δx</i> (相互相関で算出)</span>
+      <span class="bar" style="background:var(--muted)"></span>
+      <span>レーザー発光間隔 <i>Δt</i></span>
+    </span>
+  </div>
+  <div class="eq-desc">
+    <div><b style="color:var(--c-f1)">■</b> フレーム1 (t)</div>
+    <div><b style="color:var(--c-f2)">■</b> フレーム2 (t + Δt)</div>
+    <div><b style="color:var(--c-vec)">↗</b> 相関ピーク (Δx, Δy)</div>
+  </div>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 I</span><h2>単一ウィンドウでの相互相関 — Δt のジレンマ</h2></div>
+  <p class="lead">流れの中の1つの「検査領域（インタロゲーションウィンドウ）」に注目します。「撮影」ボタンを押すと、時間差 $\Delta t$ で2枚の画像を取得します。$\Delta t$ が短すぎると移動量が小さすぎて誤差に埋もれ、長すぎると粒子がウィンドウ外へ出てしまい相関が取れません（Loss of Pairs）。</p>
+  
+  <div class="panel grid2">
+    <div>
+      <div style="position:relative; width:100%; aspect-ratio:1/1;">
+        <canvas id="cv1d" width="400" height="400" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; justify-content:center;">
+      <div class="controls" style="grid-template-columns:1fr; margin-top:0">
+        <div class="ctl time">
+          <label><b>レーザー発光間隔 (Δt)</b> <output id="o-dt">中 (最適)</output></label>
+          <input type="range" id="s-dt" min="1" max="60" step="1" value="20">
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button class="primary" id="b-capture1" style="width:100%; padding:14px; font-size:15px">📸 ダブルパルス撮影 (Cross-Correlation)</button>
+      </div>
+
+      <div class="status-badge st-good" id="status-1">
+        <span><b>相関状態:</b> <span id="st1-msg">待機中</span></span>
+        <span id="st1-val" style="font-family:Georgia; font-size:18px;">-</span>
+      </div>
+
+      <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; margin-top:20px;">
+        <b>1/4 ルール (Rule of Thumb):</b><br>
+        良好な相互相関を得るには、粒子の最大移動量が「ウィンドウサイズの 1/4 以下」である必要があります。Δt スライダーを右端まで動かして撮影すると、粒子が枠外に消え、誤ったベクトル（誤ベクトル）が算出される様子が確認できます。
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 II</span><h2>全視野解析 — 空間分解能とシード密度のトレードオフ</h2></div>
+  <p class="lead">エンジン筒内のスワールを模した渦流れを解析します。検査領域（ウィンドウサイズ）を小さくすれば細かい渦（高い空間分解能）を捉えられますが、1つの枠内に入る粒子数が減るためエラーが増えます。シード粒子の密度とウィンドウサイズを変更して「PIV解析」を実行してください。</p>
+  
+  <div class="panel">
+    <div class="grid2" style="grid-template-columns: 1.2fr 0.8fr;">
+      <div>
+        <canvas id="cv2d" width="500" height="500" style="max-width:100%; aspect-ratio:1/1"></canvas>
+      </div>
+      <div style="display:flex; flex-direction:column; justify-content:space-between;">
+        
+        <div>
+          <div class="controls" style="grid-template-columns:1fr; margin-top:0">
+            <div class="ctl seed">
+              <label><b style="color:var(--c-laser)">シード粒子密度 (Seeding Density)</b> <output id="o-seed">中</output></label>
+              <input type="range" id="s-seed" min="500" max="4000" step="100" value="1500">
+            </div>
+          </div>
+          
+          <div style="margin-top:20px;">
+            <label style="font-size:13px; color:var(--muted); display:block; margin-bottom:8px;"><b>検査領域サイズ (Window Size)</b></label>
+            <div class="radio-group" id="rg-window">
+              <input type="radio" id="w64" name="winsize" value="64">
+              <label for="w64">64 x 64 px (低解像度)</label>
+              
+              <input type="radio" id="w32" name="winsize" value="32" checked>
+              <label for="w32">32 x 32 px (標準)</label>
+              
+              <input type="radio" id="w16" name="winsize" value="16">
+              <label for="w16">16 x 16 px (高解像度)</label>
+            </div>
+          </div>
+
+          <div class="btnrow" style="margin-top:30px">
+            <button class="primary" id="b-run-piv" style="width:100%; padding:14px; font-size:15px">⚙️ PIV解析を実行 (Vectorize)</button>
+            <button id="b-clear" style="width:100%;">ライブ映像に戻る</button>
+          </div>
+        </div>
+
+        <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; margin-top:20px;">
+          <b>妥当なベクトルの条件:</b><br>
+          1つの検査領域内に<b>「最低5〜10個の粒子」</b>が存在しないと、相関ピークがノイズに埋もれ、赤い「誤ベクトル (Spurious Vector)」が発生します。高解像度 (16x16) で解析する場合は、シード密度を最大まで上げる必要があります。
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  YAHAGI ZOO / 流体・燃焼工学 教育ツール<br>
+  (※ このデモは教育用に相互相関アルゴリズムの挙動とエラー発生確率を簡易的にシミュレートしたものです)
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   共通ユーティリティ
+============================================================ */
+function drawParticle(ctx, x, y, color, size=2) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawArrow(ctx, fromX, fromY, toX, toY, color) {
+  const headlen = 8;
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const angle = Math.atan2(dy, dx);
+  
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+  
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+
+/* ============================================================
+   実験1: 単一ウィンドウでの相互相関 (dtの影響)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv1d");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  
+  const sDt = document.getElementById("s-dt");
+  const oDt = document.getElementById("o-dt");
+  const statusEl = document.getElementById("status-1");
+  const stMsg = document.getElementById("st1-msg");
+  const stVal = document.getElementById("st1-val");
+  
+  let particles = [];
+  const N = 80;
+  const winSize = 160; // 画面中央の枠
+  const cx = W/2, cy = H/2;
+  
+  let frame1 = [];
+  let frame2 = [];
+  let isCaptured = false;
+  let flowAngle = -Math.PI / 4; // 右上方向
+  let flowSpeed = 2.0;
+
+  function initParticles() {
+    particles = [];
+    for(let i=0; i<N; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: Math.random() * H
+      });
+    }
+  }
+  initParticles();
+
+  sDt.addEventListener("input", () => {
+    let dt = parseInt(sDt.value);
+    if(dt < 10) oDt.textContent = dt + " (短すぎ)";
+    else if(dt < 35) oDt.textContent = dt + " (最適)";
+    else oDt.textContent = dt + " (長すぎ)";
+  });
+
+  document.getElementById("b-capture1").addEventListener("click", () => {
+    // Frame 1
+    frame1 = particles.map(p => ({x: p.x, y: p.y}));
+    
+    // Simulate dt
+    let dt = parseInt(sDt.value);
+    frame2 = particles.map(p => {
+      // Add slight turbulence/noise
+      let nx = (Math.random()-0.5)*0.5;
+      let ny = (Math.random()-0.5)*0.5;
+      return {
+        x: p.x + (Math.cos(flowAngle)*flowSpeed + nx) * dt,
+        y: p.y + (Math.sin(flowAngle)*flowSpeed + ny) * dt
+      };
+    });
+    
+    isCaptured = true;
+    
+    // Evaluate Result
+    let dx = Math.cos(flowAngle)*flowSpeed * dt;
+    let dy = Math.sin(flowAngle)*flowSpeed * dt;
+    let displacement = Math.sqrt(dx*dx + dy*dy);
+    
+    if (displacement < 3) {
+      statusEl.className = "status-badge st-warn";
+      stMsg.textContent = "変位が小さすぎます (S/N比悪化)";
+      stVal.textContent = "Error";
+    } else if (displacement > winSize / 4) {
+      statusEl.className = "status-badge st-err";
+      stMsg.textContent = "Loss of Pairs (1/4ルール違反)";
+      stVal.textContent = "Error";
+    } else {
+      statusEl.className = "status-badge st-good";
+      stMsg.textContent = "相関ピーク取得成功";
+      stVal.textContent = "V = " + (displacement/dt).toFixed(2);
+    }
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+      isCaptured = false;
+      statusEl.className = "status-badge";
+      stMsg.textContent = "待機中";
+      stVal.textContent = "-";
+    }, 4000);
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    
+    // Grid background
+    ctx.strokeStyle = "rgba(140, 160, 200, 0.1)";
+    ctx.lineWidth = 1;
+    for(let i=0; i<W; i+=20) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(W, i); ctx.stroke();
+    }
+    
+    // Interrogation Window
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(cx - winSize/2, cy - winSize/2, winSize, winSize);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("Interrogation Window", cx - winSize/2, cy - winSize/2 - 5);
+
+    if (!isCaptured) {
+      // Live flowing particles
+      for(let p of particles) {
+        p.x += Math.cos(flowAngle) * flowSpeed;
+        p.y += Math.sin(flowAngle) * flowSpeed;
+        if(p.x > W) p.x -= W; if(p.x < 0) p.x += W;
+        if(p.y > H) p.y -= H; if(p.y < 0) p.y += H;
+        drawParticle(ctx, p.x, p.y, "rgba(255,255,255,0.8)", 3);
+      }
+    } else {
+      // Captured frames overlay
+      for(let p of frame1) drawParticle(ctx, p.x, p.y, "var(--c-f1)", 3);
+      for(let p of frame2) drawParticle(ctx, p.x, p.y, "var(--c-f2)", 3);
+      
+      // Draw cross-correlation vector from center
+      let dt = parseInt(sDt.value);
+      let dx = Math.cos(flowAngle)*flowSpeed * dt;
+      let dy = Math.sin(flowAngle)*flowSpeed * dt;
+      let displacement = Math.sqrt(dx*dx + dy*dy);
+      
+      if (displacement <= winSize / 4 && displacement >= 3) {
+        drawArrow(ctx, cx, cy, cx + dx, cy + dy, "var(--c-vec)");
+      } else if (displacement > winSize / 4) {
+        // Draw random erroneous vector
+        let rx = (Math.random()-0.5)*winSize;
+        let ry = (Math.random()-0.5)*winSize;
+        drawArrow(ctx, cx, cy, cx + rx, cy + ry, "var(--c-err, #FF3366)");
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ============================================================
+   実験2: 全視野解析 (空間分解能 vs シード密度)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv2d");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  
+  const sSeed = document.getElementById("s-seed");
+  const oSeed = document.getElementById("o-seed");
+  const radios = document.getElementsByName("winsize");
+  
+  let particles = [];
+  let isAnalyzing = false;
+  
+  // Theoretical Flow Field: Rankine-like Vortex
+  const vortexX = W/2, vortexY = H/2;
+  const coreRadius = 80;
+  const gamma = 15000;
+
+  function getVelocity(x, y) {
+    let dx = x - vortexX;
+    let dy = y - vortexY;
+    let r2 = dx*dx + dy*dy;
+    let r = Math.sqrt(r2);
+    if(r === 0) return {u: 0, v: 0};
+    
+    let vel = 0;
+    if (r < coreRadius) {
+      vel = (gamma * r) / (2 * Math.PI * coreRadius * coreRadius); // Solid body rotation
+    } else {
+      vel = gamma / (2 * Math.PI * r); // Potential vortex
+    }
+    
+    // 逆時計回り
+    return { u: -vel * (dy/r), v: vel * (dx/r) };
+  }
+
+  function updateSeed() {
+    let N = parseInt(sSeed.value);
+    if(N < 1000) oSeed.textContent = "低 (スカスカ)";
+    else if(N < 3000) oSeed.textContent = "中 (標準)";
+    else oSeed.textContent = "高 (密)";
+
+    // Adjust particle array size
+    if (particles.length < N) {
+      for(let i = particles.length; i < N; i++) {
+        particles.push({ x: Math.random()*W, y: Math.random()*H });
+      }
+    } else if (particles.length > N) {
+      particles.splice(N);
+    }
+  }
+  sSeed.addEventListener("input", updateSeed);
+  updateSeed();
+
+  document.getElementById("b-run-piv").addEventListener("click", () => {
+    isAnalyzing = true;
+  });
+  document.getElementById("b-clear").addEventListener("click", () => {
+    isAnalyzing = false;
+  });
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    if (!isAnalyzing) {
+      // Live flowing particles
+      for(let p of particles) {
+        let v = getVelocity(p.x, p.y);
+        p.x += v.u * 0.1;
+        p.y += v.v * 0.1;
+        // Boundary wrap
+        if(p.x > W) p.x = Math.random()*W; if(p.x < 0) p.x = Math.random()*W;
+        if(p.y > H) p.y = Math.random()*H; if(p.y < 0) p.y = Math.random()*H;
+        
+        drawParticle(ctx, p.x, p.y, "rgba(0, 255, 102, 0.7)", 1.5);
+      }
+    } else {
+      // PIV Analysis Mode (Show Vector Field)
+      // Get Window Size
+      let winSize = 32;
+      for(let r of radios) { if(r.checked) winSize = parseInt(r.value); }
+      
+      const overlap = 0.5; // 50% overlap is standard in PIV
+      const step = winSize * (1 - overlap);
+      
+      ctx.strokeStyle = "rgba(140, 160, 200, 0.2)";
+      ctx.lineWidth = 1;
+      
+      // Simulate PIV Interrogation
+      for (let y = 0; y < H - winSize; y += step) {
+        for (let x = 0; x < W - winSize; x += step) {
+          
+          // Draw grid box
+          ctx.strokeRect(x, y, winSize, winSize);
+          
+          // Count particles in this window
+          let count = 0;
+          for(let p of particles) {
+            if (p.x >= x && p.x < x + winSize && p.y >= y && p.y < y + winSize) {
+              count++;
+            }
+          }
+          
+          let cx = x + winSize/2;
+          let cy = y + winSize/2;
+          let v = getVelocity(cx, cy);
+          
+          // PIV simulation rule: Needs at least ~5 particles for a reliable vector
+          if (count >= 5) {
+            // Good Vector (Spatial average simulated by theoretical center velocity)
+            let scale = 0.5;
+            drawArrow(ctx, cx, cy, cx + v.u * scale, cy + v.v * scale, "var(--c-vec)");
+          } else if (count > 0) {
+            // Spurious Vector (Random direction/magnitude due to noise/lack of pairs)
+            let errX = (Math.random()-0.5)*winSize*0.8;
+            let errY = (Math.random()-0.5)*winSize*0.8;
+            drawArrow(ctx, cx, cy, cx + errX, cy + errY, "#FF3366");
+          }
+          // if count == 0, dropout (no vector)
+        }
+      }
+      
+      // Overlay particle ghosting slightly
+      for(let p of particles) drawParticle(ctx, p.x, p.y, "rgba(0, 255, 102, 0.15)", 1.5);
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

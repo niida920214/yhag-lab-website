@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ダムケラー数＆拡散火炎 体験ラボ</title>
+<style>
+:root{
+  --bg:#0A0E17;
+  --panel:#131B2A;
+  --panel2:#0D131E;
+  --line:rgba(140, 160, 200, 0.15);
+  --text:#E2E8F0;
+  --muted:#8B9BB4;
+  --c-flow:#57C7F0;   /* 流動 */
+  --c-chem:#FF5A00;   /* 化学反応 */
+  --c-fuel:#6FD98F;   /* 燃料 */
+  --c-ox:#57C7F0;     /* 酸化剤 */
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 90px}
+header{padding:40px 0 10px}
+.eyebrow{font-size:12px;letter-spacing:0.2em;color:var(--muted);margin-bottom:10px;text-transform:uppercase;}
+h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:0.03em}
+h1 small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:8px;}
+section{margin-top:50px}
+.sec-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:20px}
+.sec-num{font-family:Georgia,serif;font-style:italic;font-size:16px;color:var(--muted);}
+h2{font-size:20px;font-weight:700}
+.lead{color:var(--muted);font-size:14.5px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
+canvas{display:block;width:100%;height:auto;border-radius:8px;background:var(--panel2);touch-action:none; border:1px solid var(--line)}
+
+/* ===== Equation ===== */
+.eq-stage{
+  background:linear-gradient(180deg,#131B2A 0%,#0D131E 100%);
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:35px 20px 25px;margin-top:20px; text-align:center;
+}
+.equation{
+  display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+  gap:15px;font-family:Georgia,"Times New Roman",serif;font-size:clamp(24px,5vw,36px);
+}
+.term{
+  display:inline-flex;flex-direction:column;align-items:center;
+  padding:10px 16px;border-radius:10px;
+  position:relative;
+}
+.frac{display:inline-flex;flex-direction:column;align-items:center;line-height:1.2;font-size:0.9em}
+.frac .bar{width:100%;height:2px;background:currentColor;margin:4px 0;}
+.eq-desc{margin-top:25px;font-size:14.5px;color:#C6CEDD;display:flex;justify-content:center;gap:30px;flex-wrap:wrap;}
+.eq-desc div{display:flex;align-items:center;gap:8px;}
+.eq-desc .dot{width:10px;height:10px;border-radius:50%;}
+
+/* ===== Controls ===== */
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 24px;margin-top:20px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:var(--muted)}
+.ctl label b{color:var(--text);font-weight:600}
+.ctl output{font-family:Georgia,serif;font-style:italic;color:var(--text)}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:5px;border-radius:3px;
+  background:#23304A;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--thumb,#fff);border:2px solid #0A0E17;cursor:pointer;
+}
+.ctl.flow{--thumb:var(--c-flow)} .ctl.chem{--thumb:var(--c-chem)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+button{
+  background:#1C263A;border:1px solid var(--line);color:var(--text);
+  padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+  transition:background 0.2s;
+}
+button:hover{background:#283652}
+button.primary{background:#23304A; border-color:#57C7F0; color:#57C7F0; font-weight:600}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* Da Badge */
+.da-badge{
+  background:rgba(0,0,0,0.3); border:1px solid var(--line); border-radius:8px;
+  padding:12px 16px; margin-top:20px; display:flex; justify-content:space-between; align-items:center;
+}
+.da-value{font-family:Georgia,serif; font-size:24px; font-weight:bold;}
+.da-status{font-size:14px; font-weight:bold; padding:4px 10px; border-radius:4px;}
+.status-burn{background:rgba(255,90,0,0.2); color:#FF7A2E;}
+.status-ext{background:rgba(87,199,240,0.2); color:#57C7F0;}
+
+footer{margin-top:60px;border-top:1px solid var(--line);padding:20px 0;font-size:12px;color:var(--muted);text-align:center}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">YAHAGI ZOO / 教育ツール</div>
+  <h1>ダムケラー数＆拡散火炎 体験ラボ
+    <small>流動と化学反応の「時間スケールのせめぎ合い」を可視化する</small>
+  </h1>
+</header>
+
+<div class="eq-stage">
+  <div class="equation">
+    <span><i>Da</i></span>
+    <span style="color:var(--muted)">=</span>
+    <span class="frac">
+      <span style="color:var(--c-flow)">τ<sub>flow</sub> (流動の時間)</span>
+      <span class="bar" style="background:var(--muted)"></span>
+      <span style="color:var(--c-chem)">τ<sub>chem</sub> (反応の時間)</span>
+    </span>
+    <span style="color:var(--muted)">≈</span>
+    <span class="frac">
+      <span style="color:var(--c-chem)">反応速度 <i>k</i></span>
+      <span class="bar" style="background:var(--muted)"></span>
+      <span style="color:var(--c-flow)">ひずみ速度 <i>a</i> (流速)</span>
+    </span>
+  </div>
+  <div class="eq-desc">
+    <div><span class="dot" style="background:var(--c-flow)"></span> <b>流動・混合が速い (τ_flow が小)</b> = 火炎が吹き飛ぶ・消炎する (Da &lt; 1)</div>
+    <div><span class="dot" style="background:var(--c-chem)"></span> <b>化学反応が速い (τ_chem が小)</b> = 火炎が安定して燃え続ける (Da &gt; 1)</div>
+  </div>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 I</span><h2>対向流拡散火炎 — 局所消炎 (Local Extinction) の限界</h2></div>
+  <p class="lead">左から燃料（緑）、右から空気（青）を吹き付けて中央で燃やす1次元シミュレーション。流速（ひずみ速度）を上げすぎると、反応の熱が吹き飛ばされ、火炎が維持できずに「局所消炎」を起こします。Da数が限界値を下回る瞬間を観察してください。</p>
+  <div class="panel">
+    <canvas id="cv1d" width="900" height="280"></canvas>
+    
+    <div class="controls">
+      <div class="ctl flow">
+        <label><b style="color:var(--c-flow)">ひずみ速度 a (吹き付ける流速)</b> <output id="o-strain">1.0</output></label>
+        <input type="range" id="s-strain" min="0.1" max="5.0" step="0.1" value="1.0">
+      </div>
+      <div class="ctl chem">
+        <label><b style="color:var(--c-chem)">化学反応速度 k</b> <output id="o-rate1">50</output></label>
+        <input type="range" id="s-rate1" min="10" max="200" step="5" value="50">
+      </div>
+    </div>
+    
+    <div class="da-badge">
+      <div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">局所ダムケラー数 (Da ∝ k/a)</div>
+        <div class="da-value" id="da-val1">50.0</div>
+      </div>
+      <div class="da-status status-burn" id="da-status1">🔥 安定燃焼 (Burning)</div>
+    </div>
+
+    <div class="btnrow">
+      <button id="b-ignite1">⚡ 再点火</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">実験 II</span><h2>噴流拡散火炎 — リフトオフと吹き消え (Blow-off)</h2></div>
+  <p class="lead">下部から燃料を噴射する2次元ジェット火炎。噴射流速（U）を上げると、根元のDa数が低下し、火炎がノズルから浮き上がる「リフトオフ」が発生します。さらに流速を上げると、火炎全体が吹き消えます。ディーゼルエンジンの噴霧火炎などに応用される概念です。</p>
+  <div class="panel grid2">
+    <div>
+      <canvas id="cv2d" width="400" height="500" style="max-width:100%; aspect-ratio:4/5"></canvas>
+    </div>
+    <div style="display:flex; flex-direction:column; justify-content:space-between;">
+      <div>
+        <div class="controls" style="grid-template-columns:1fr; margin-top:0">
+          <div class="ctl flow">
+            <label><b style="color:var(--c-flow)">燃料噴射流速 U</b> <output id="o-jet">1.5</output></label>
+            <input type="range" id="s-jet" min="0.5" max="8.0" step="0.1" value="1.5">
+          </div>
+          <div class="ctl chem">
+            <label><b style="color:var(--c-chem)">化学反応速度 k</b> <output id="o-rate2">120</output></label>
+            <input type="range" id="s-rate2" min="50" max="300" step="10" value="120">
+          </div>
+        </div>
+        
+        <div class="da-badge" style="flex-direction:column; align-items:flex-start; gap:10px;">
+          <div style="font-size:12px; color:var(--muted);">ノズル近傍の ダムケラー数 (Da ∝ k/U)</div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+            <div class="da-value" id="da-val2">80.0</div>
+            <div class="da-status status-burn" id="da-status2">🔥 付着火炎</div>
+          </div>
+        </div>
+
+        <div class="btnrow" style="margin-top:30px;">
+          <button class="primary" id="b-ignite2" style="width:100%; padding:12px 0;">⚡ パルス点火</button>
+        </div>
+      </div>
+      
+      <div style="font-size:12.5px; color:var(--muted); background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+        <b>観察ポイント：</b><br>
+        ①流速Uを少し上げる → ノズル根元での滞在時間が短くなり、火炎が上方に浮き上がります（リフトオフ）。<br>
+        ②さらに流速Uを上げる → Da数が限界を超え、反応が流動に追いつけず完全に吹き消えます（ブローオフ）。
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  YAHAGI ZOO / 流体・燃焼工学 教育ツール<br>
+  (※ このシミュレーションは教育用にAdvection-Diffusion-Reaction方程式を簡略化して解いたリアルタイムデモです)
+</footer>
+
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   実験1: 1D 対向流拡散火炎 (Counterflow Diffusion Flame)
+   方程式: ∂φ/∂t = -u(x)∂φ/∂x + D∂²φ/∂x² + S
+   u(x) = -a * x  (a: ひずみ速度)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv1d");
+  const ctx = cv.getContext("2d");
+  const N = 200, dx = 2.0 / N; // x from -1 to 1
+  
+  let YF = new Float32Array(N); // 燃料
+  let YO = new Float32Array(N); // 酸化剤
+  let T  = new Float32Array(N); // 温度
+  
+  let YF_new = new Float32Array(N);
+  let YO_new = new Float32Array(N);
+  let T_new  = new Float32Array(N);
+
+  const sStrain = document.getElementById("s-strain");
+  const sRate   = document.getElementById("s-rate1");
+  const oStrain = document.getElementById("o-strain");
+  const oRate   = document.getElementById("o-rate1");
+  
+  const daVal = document.getElementById("da-val1");
+  const daStatus = document.getElementById("da-status1");
+
+  function init() {
+    for(let i=0; i<N; i++) {
+      let x = (i/N)*2.0 - 1.0;
+      YF[i] = x < 0 ? 1.0 : 0.0;
+      YO[i] = x > 0 ? 1.0 : 0.0;
+      // 初期火種 (中央付近)
+      T[i]  = Math.exp(-x*x*50) * 1.0; 
+    }
+  }
+  init();
+
+  document.getElementById("b-ignite1").addEventListener("click", () => {
+    for(let i=0; i<N; i++) {
+      let x = (i/N)*2.0 - 1.0;
+      T[i] = Math.max(T[i], Math.exp(-x*x*100) * 1.0); 
+    }
+  });
+
+  function update() {
+    const a = parseFloat(sStrain.value);
+    const k = parseFloat(sRate.value);
+    oStrain.textContent = a.toFixed(1);
+    oRate.textContent = k.toFixed(0);
+    
+    // Da = k / a
+    const Da = k / a;
+    daVal.textContent = Da.toFixed(1);
+    
+    const dt = 0.002;
+    const D = 0.05; // 拡散係数
+    
+    let maxT = 0;
+
+    for(let i=1; i<N-1; i++) {
+      let x = (i/N)*2.0 - 1.0;
+      let u = -a * x; // よどみ点流れ (中心に向かって流れる)
+      
+      // Upwind differencing for advection
+      let advF = u > 0 ? u*(YF[i]-YF[i-1])/dx : u*(YF[i+1]-YF[i])/dx;
+      let advO = u > 0 ? u*(YO[i]-YO[i-1])/dx : u*(YO[i+1]-YO[i])/dx;
+      let advT = u > 0 ? u*(T[i]-T[i-1])/dx : u*(T[i+1]-T[i])/dx;
+      
+      // Central differencing for diffusion
+      let diffF = D * (YF[i+1] - 2*YF[i] + YF[i-1]) / (dx*dx);
+      let diffO = D * (YO[i+1] - 2*YO[i] + YO[i-1]) / (dx*dx);
+      let diffT = D * (T[i+1]  - 2*T[i]  + T[i-1])  / (dx*dx);
+      
+      // Reaction: highly non-linear with T to allow sudden extinction
+      // 強い温度依存性を持たせる (T^4)
+      let rxn = 0;
+      if (T[i] > 0.1) {
+        rxn = k * YF[i] * YO[i] * Math.pow(T[i], 4);
+      }
+      
+      YF_new[i] = YF[i] + dt * (-advF + diffF - rxn);
+      YO_new[i] = YO[i] + dt * (-advO + diffO - rxn);
+      T_new[i]  = T[i]  + dt * (-advT + diffT + rxn * 2.0); // 発熱量
+      
+      if(T_new[i] > maxT) maxT = T_new[i];
+    }
+    
+    // Boundary conditions
+    YF_new[0] = 1.0; YO_new[0] = 0.0; T_new[0] = 0.0;
+    YF_new[N-1] = 0.0; YO_new[N-1] = 1.0; T_new[N-1] = 0.0;
+    
+    for(let i=0; i<N; i++){
+      YF[i] = Math.max(0, Math.min(1, YF_new[i]));
+      YO[i] = Math.max(0, Math.min(1, YO_new[i]));
+      T[i]  = Math.max(0, Math.min(1.5, T_new[i]));
+    }
+    
+    // Status update
+    if (maxT > 0.3) {
+      daStatus.textContent = "🔥 安定燃焼 (Burning)";
+      daStatus.className = "da-status status-burn";
+    } else {
+      daStatus.textContent = "💨 局所消炎 (Extinction)";
+      daStatus.className = "da-status status-ext";
+    }
+  }
+
+  function draw() {
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    
+    // Grid & Labels
+    ctx.strokeStyle = "rgba(140, 160, 200, 0.15)";
+    ctx.beginPath();
+    ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H);
+    ctx.moveTo(0, H-30); ctx.lineTo(W, H-30);
+    ctx.stroke();
+    
+    ctx.fillStyle = "var(--muted)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("燃料 (Fuel) →", 20, 25);
+    ctx.fillText("← 空気 (Air)", W - 80, 25);
+    ctx.fillText("よどみ点 (Stagnation Plane)", W/2 + 10, H - 10);
+
+    // Legend
+    ctx.fillStyle = "var(--c-fuel)"; ctx.fillText("── 燃料 Y_F", 20, 45);
+    ctx.fillStyle = "var(--c-ox)";   ctx.fillText("── 酸素 Y_O", 20, 60);
+    ctx.fillStyle = "var(--c-chem)"; ctx.fillText("── 温度 T", 20, 75);
+
+    function drawLine(arr, color, scale, lineWidth) {
+      ctx.beginPath();
+      ctx.moveTo(0, H - 30 - arr[0]*scale);
+      for(let i=1; i<N; i++) {
+        ctx.lineTo(i*(W/N), H - 30 - arr[i]*scale);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+    
+    // Draw Area for Flame
+    ctx.beginPath();
+    ctx.moveTo(0, H-30);
+    for(let i=0; i<N; i++) ctx.lineTo(i*(W/N), H - 30 - T[i]*150);
+    ctx.lineTo(W, H-30);
+    ctx.fillStyle = "rgba(255, 90, 0, 0.15)";
+    ctx.fill();
+
+    drawLine(YF, "var(--c-fuel)", 100, 2);
+    drawLine(YO, "var(--c-ox)", 100, 2);
+    drawLine(T,  "var(--c-chem)", 150, 3);
+  }
+
+  function loop1() {
+    for(let k=0; k<10; k++) update();
+    draw();
+    requestAnimationFrame(loop1);
+  }
+  loop1();
+})();
+
+/* ============================================================
+   実験2: 2D 噴流拡散火炎 (Jet Diffusion Flame)
+============================================================ */
+(function(){
+  const cv = document.getElementById("cv2d");
+  const ctx = cv.getContext("2d");
+  const Nx = 60, Ny = 100; // grid
+  const N2 = Nx * Ny;
+  const dx = 1.0;
+  
+  let YF = new Float32Array(N2);
+  let YO = new Float32Array(N2);
+  let T  = new Float32Array(N2);
+  
+  let YF_new = new Float32Array(N2);
+  let YO_new = new Float32Array(N2);
+  let T_new  = new Float32Array(N2);
+  
+  const sJet  = document.getElementById("s-jet");
+  const sRate = document.getElementById("s-rate2");
+  const oJet  = document.getElementById("o-jet");
+  const oRate = document.getElementById("o-rate2");
+  
+  const daVal = document.getElementById("da-val2");
+  const daStatus = document.getElementById("da-status2");
+
+  const nozzleW = 6; // ノズル幅 (セル数)
+  const cx = Math.floor(Nx/2);
+
+  function init() {
+    for(let i=0; i<N2; i++) {
+      YF[i] = 0.0;
+      YO[i] = 1.0; // 背景は空気
+      T[i]  = 0.0;
+    }
+  }
+  init();
+
+  function ignite() {
+    for(let j=Ny-20; j<Ny; j++) {
+      for(let i=cx-6; i<=cx+6; i++) {
+        T[j*Nx + i] = 1.2;
+      }
+    }
+  }
+  document.getElementById("b-ignite2").addEventListener("click", ignite);
+  ignite();
+
+  function update() {
+    const Ujet = parseFloat(sJet.value);
+    const k = parseFloat(sRate.value);
+    oJet.textContent = Ujet.toFixed(1);
+    oRate.textContent = k.toFixed(0);
+    
+    const Da = k / (Ujet * 5); // 係数はスケール合わせ
+    daVal.textContent = Da.toFixed(1);
+    
+    const dt = 0.02;
+    const D = 0.3; // 拡散
+    
+    let maxT = 0;
+    let attachT = 0; // ノズル近傍の温度
+
+    // Boundary at y=Ny-1 (bottom injection)
+    for(let i=0; i<Nx; i++) {
+      let isNozzle = Math.abs(i - cx) <= nozzleW/2;
+      YF[(Ny-1)*Nx + i] = isNozzle ? 1.0 : 0.0;
+      YO[(Ny-1)*Nx + i] = isNozzle ? 0.0 : 1.0;
+      T[(Ny-1)*Nx + i]  = 0.0; // 吹き出すガスは冷たい
+    }
+
+    for(let j=Ny-2; j>=1; j--) {
+      for(let i=1; i<Nx-1; i++) {
+        let idx = j*Nx + i;
+        
+        let isNozzleRegion = Math.abs(i - cx) <= nozzleW/2 + 2;
+        // Jet expands slightly, simplified flow field (y-direction only)
+        let v = isNozzleRegion ? Ujet * Math.exp(-(Ny-j)/30) : 0.2; // co-flow 0.2
+        
+        // Upwind for y-advection
+        let advF = v * (YF[idx] - YF[idx+Nx]) / dx; // flow is upwards (decreasing j)
+        let advO = v * (YO[idx] - YO[idx+Nx]) / dx;
+        let advT = v * (T[idx]  - T[idx+Nx])  / dx;
+        
+        // 2D Diffusion
+        let diffF = D * (YF[idx+1] + YF[idx-1] + YF[idx+Nx] + YF[idx-Nx] - 4*YF[idx]) / (dx*dx);
+        let diffO = D * (YO[idx+1] + YO[idx-1] + YO[idx+Nx] + YO[idx-Nx] - 4*YO[idx]) / (dx*dx);
+        let diffT = D * (T[idx+1]  + T[idx-1]  + T[idx+Nx]  + T[idx-Nx]  - 4*T[idx])  / (dx*dx);
+        
+        let rxn = 0;
+        if (T[idx] > 0.1) {
+          rxn = k * YF[idx] * YO[idx] * Math.pow(T[idx], 3); // T^3 for stability vs extinction
+        }
+        
+        YF_new[idx] = YF[idx] + dt * (-advF + diffF - rxn);
+        YO_new[idx] = YO[idx] + dt * (-advO + diffO - rxn * 1.5); // Stoichiometry offset
+        T_new[idx]  = T[idx]  + dt * (-advT + diffT + rxn * 3.0);
+        
+        if (T_new[idx] > maxT) maxT = T_new[idx];
+        if (j > Ny-10 && T_new[idx] > attachT) attachT = T_new[idx]; // ノズル付近の最大温度
+      }
+    }
+    
+    // Copy back & enforce limits
+    for(let j=1; j<Ny-1; j++) {
+      for(let i=1; i<Nx-1; i++) {
+        let idx = j*Nx + i;
+        YF[idx] = Math.max(0, Math.min(1, YF_new[idx]));
+        YO[idx] = Math.max(0, Math.min(1, YO_new[idx]));
+        T[idx]  = Math.max(0, Math.min(1.5, T_new[idx]));
+      }
+    }
+    
+    // Status update
+    if (maxT < 0.2) {
+      daStatus.textContent = "💨 吹き消え (Blow-off)";
+      daStatus.className = "da-status status-ext";
+    } else if (attachT < 0.3) {
+      daStatus.textContent = "☁️ リフトオフ (Lift-off)";
+      daStatus.className = "da-status status-ext";
+    } else {
+      daStatus.textContent = "🔥 付着火炎 (Attached)";
+      daStatus.className = "da-status status-burn";
+    }
+  }
+
+  // 描画用のImageData
+  const imgData = ctx.createImageData(Nx, Ny);
+  const buf = new Uint32Array(imgData.data.buffer);
+
+  function draw() {
+    for(let j=0; j<Ny; j++) {
+      for(let i=0; i<Nx; i++) {
+        let idx = j*Nx + i;
+        
+        let r=10, g=14, b=23; // bg color
+        
+        // 燃料の色 (緑系)
+        if (YF[idx] > 0.05) {
+          let f = Math.min(1, YF[idx]*2);
+          r += f*30; g += f*80; b += f*40;
+        }
+        
+        // 火炎の色 (温度依存)
+        if (T[idx] > 0.1) {
+          let t = Math.min(1, T[idx]/1.2);
+          if(t < 0.5) {
+            let t2 = t/0.5;
+            r += t2*200; g += t2*50;
+          } else {
+            let t2 = (t-0.5)/0.5;
+            r = 255; g = 100 + t2*155; b += t2*200;
+          }
+        }
+        
+        r = Math.min(255, r);
+        g = Math.min(255, g);
+        b = Math.min(255, b);
+        
+        buf[idx] = (255 << 24) | (b << 16) | (g << 8) | r;
+      }
+    }
+    
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = Nx; offCanvas.height = Ny;
+    offCanvas.getContext("2d").putImageData(imgData, 0, 0);
+    
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.drawImage(offCanvas, 0, 0, cv.width, cv.height);
+    
+    // ノズルの描画
+    ctx.fillStyle = "#5E6B84";
+    const drawW = cv.width;
+    const drawH = cv.height;
+    const cw = drawW / Nx;
+    const cx_px = cx * cw;
+    const nw_px = nozzleW * cw;
+    ctx.fillRect(cx_px - nw_px/2, drawH - 10, nw_px, 10);
+  }
+
+  function loop2() {
+    for(let k=0; k<2; k++) update();
+    draw();
+    requestAnimationFrame(loop2);
+  }
+  loop2();
+})();
+</script>
+</body>
+</html>
