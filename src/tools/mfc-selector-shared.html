@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MFC選定アシスタント</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F4F6F7;
+    --panel: #FFFFFF;
+    --panel-2: #EBEEF0;
+    --ink: #171B1E;
+    --ink-soft: #4B5459;
+    --ink-faint: #8A9297;
+    --line: #D8DEE1;
+    --line-strong: #B9C2C6;
+    --accent: #1F5F8B;
+    --accent-ink: #0F3A57;
+    --accent-soft: #E4EEF4;
+    --good: #2F7A52;
+    --good-soft: #E4F1E9;
+    --warn: #B4581A;
+    --warn-soft: #F8E9DD;
+    --bad: #A93226;
+    --bad-soft: #F7E4E1;
+    --radius: 3px;
+    --shadow: 0 1px 2px rgba(23,27,30,0.06), 0 1px 1px rgba(23,27,30,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181A; --panel: #1C2124; --panel-2: #22282B;
+      --ink: #EDEFF0; --ink-soft: #B7BEC2; --ink-faint: #7C868B;
+      --line: #333B3F; --line-strong: #454F53;
+      --accent: #6EB4E0; --accent-ink: #BFE0F5; --accent-soft: #1E2E38;
+      --good: #6FBE8F; --good-soft: #1B2E23;
+      --warn: #E0975A; --warn-soft: #34261A;
+      --bad: #E08579; --bad-soft: #34201C;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181A; --panel: #1C2124; --panel-2: #22282B;
+    --ink: #EDEFF0; --ink-soft: #B7BEC2; --ink-faint: #7C868B;
+    --line: #333B3F; --line-strong: #454F53;
+    --accent: #6EB4E0; --accent-ink: #BFE0F5; --accent-soft: #1E2E38;
+    --good: #6FBE8F; --good-soft: #1B2E23;
+    --warn: #E0975A; --warn-soft: #34261A;
+    --bad: #E08579; --bad-soft: #34201C;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "IBM Plex Mono", "SF Mono", monospace; }
+
+  .shell { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.top {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid var(--line-strong);
+  }
+  header.top h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
+  header.top .sub { font-size: 12.5px; color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .panel-head h2 { font-size: 14.5px; font-weight: 600; margin: 0; }
+  .panel-body { padding: 16px; }
+  .panel-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+
+  .count-pill { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+
+  table.mfc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.mfc-table th { text-align: left; font-weight: 600; color: var(--ink-soft); font-size: 11.5px; padding: 6px 8px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+  table.mfc-table td { padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.mfc-table tr:last-child td { border-bottom: none; }
+  table.mfc-table .num { font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+  table.mfc-table .name { font-weight: 600; }
+  table.mfc-table .note { color: var(--ink-faint); font-size: 12px; }
+
+  .row-actions { display: flex; gap: 6px; white-space: nowrap; }
+  .icon-btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-soft); border-radius: var(--radius); padding: 3px 8px; font-size: 12px; cursor: pointer; }
+  .icon-btn:hover { border-color: var(--line-strong); color: var(--ink); }
+  .icon-btn.danger:hover { color: var(--bad); border-color: var(--bad); }
+
+  .empty-state { padding: 28px 16px; text-align: center; color: var(--ink-faint); font-size: 13.5px; }
+
+  label.field { display: block; margin-bottom: 12px; }
+  label.field .lab { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  .gas-card {
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; background: var(--panel-2);
+  }
+  .gas-card-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .gas-card-head .gr-gas { flex: 1; }
+  .gas-card-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px;
+  }
+  .gas-card-grid.press-row { grid-template-columns: 1fr 1fr 1fr; }
+  .gas-card .g-field { display: flex; flex-direction: column; }
+  .gas-card .g-field .lab { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; }
+  @media (max-width: 520px) {
+    .gas-card-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  input[type=text], input[type=number], select {
+    width: 100%; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--panel); color: var(--ink); font-size: 13.5px; font-family: inherit;
+  }
+  input.mono, select.mono { font-family: "IBM Plex Mono", monospace; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius);
+    border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+    font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--ink-faint); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+  .btn.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
+  .btn.block { width: 100%; justify-content: center; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+
+  .helptext { font-size: 12px; color: var(--ink-faint); margin-top: 4px; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+
+  /* タブ */
+  .tabbar { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+  .tab-btn {
+    padding: 9px 4px; margin-bottom: -1px; border: none; background: transparent; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--ink-faint); border-bottom: 2px solid transparent;
+    font-family: inherit;
+  }
+  .tab-btn + .tab-btn { margin-left: 14px; }
+  .tab-btn.active { color: var(--accent-ink); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* バーナー形状 */
+  .geo-readout {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+    padding: 10px 12px; background: var(--panel-2); border-radius: var(--radius); font-size: 12px;
+  }
+  .geo-readout .g-lab { color: var(--ink-faint); }
+  .geo-readout .g-val { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+
+  fieldset.stream-block {
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-top: 14px;
+  }
+  fieldset.stream-block legend {
+    font-size: 12.5px; font-weight: 700; padding: 0 6px; color: var(--accent-ink);
+  }
+  .subgroup { padding: 10px 0 0 0; border-top: 1px dashed var(--line); margin-top: 10px; }
+  .subgroup:first-of-type { border-top: none; margin-top: 0; }
+
+  .result-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; background: var(--panel); }
+  .result-card.best { border-color: var(--good); background: var(--good-soft); }
+  .result-card.caution { border-color: var(--warn); background: var(--warn-soft); }
+  .result-card.reserved { opacity: 0.55; }
+  .result-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .result-name { font-weight: 700; font-size: 15px; }
+  .result-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-family: "IBM Plex Mono", monospace; }
+  .result-tag.best { background: var(--good); color: #fff; }
+  .result-tag.caution { background: var(--warn); color: #fff; }
+  .result-tag.ok { background: var(--panel-2); color: var(--ink-soft); border: 1px solid var(--line); }
+  .result-tag.reserved { background: var(--panel-2); color: var(--ink-faint); border: 1px solid var(--line); }
+
+  .result-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; font-size: 12.5px; }
+  .result-meta .m-lab { color: var(--ink-faint); font-size: 11px; }
+  .result-meta .m-val { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+
+  .fs-bar { margin-top: 10px; height: 6px; background: var(--panel-2); border-radius: 3px; position: relative; overflow: hidden; }
+  .fs-bar .zone { position: absolute; top: 0; bottom: 0; background: rgba(47,122,82,0.18); }
+  .fs-bar .fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); border-radius: 3px; }
+  .fs-caption { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-faint); margin-top: 3px; font-family: "IBM Plex Mono", monospace; }
+
+  .reason-list { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-soft); }
+  .reason-list li { margin-bottom: 2px; }
+
+  .excluded-block { margin-top: 18px; border-top: 1px dashed var(--line-strong); padding-top: 12px; }
+  .excluded-block summary { cursor: pointer; font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
+  .excluded-item { font-size: 12px; color: var(--ink-faint); padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .excluded-item:last-child { border-bottom: none; }
+  .excluded-item .nm { color: var(--ink-soft); font-weight: 600; }
+
+  .component-section { margin-bottom: 24px; }
+  .split-pair {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px;
+  }
+  @media (max-width: 620px) {
+    .split-pair { grid-template-columns: 1fr; }
+  }
+  .split-slot-label {
+    font-size: 11px; font-weight: 700; color: var(--ink-faint); margin-bottom: 6px;
+  }
+  .component-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--line-strong);
+  }
+  .component-head .c-title { font-size: 14px; font-weight: 700; }
+  .component-head .c-flow { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink-soft); }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px);
+    background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: var(--radius);
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  dialog#mfcDialog {
+    border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0; width: min(520px, 92vw);
+    background: var(--panel); color: var(--ink); box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  }
+  dialog#mfcDialog::backdrop { background: rgba(20,24,26,0.45); }
+  .dialog-head { padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 15px; }
+  .dialog-body { padding: 16px 18px; max-height: 70vh; overflow-y: auto; }
+  .dialog-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <h1>MFC選定アシスタント</h1>
+    <div class="sub">FLOW &middot; GAS &middot; PRESSURE &middot; PORTS</div>
+  </header>
+
+  <div class="grid">
+    <!-- 左: 登録済みMFC一覧 -->
+    <section class="panel" id="inventoryPanel">
+      <div class="panel-head">
+        <h2>登録済みMFC</h2>
+        <span class="count-pill" id="mfcCount">0台</span>
+      </div>
+      <div class="panel-body">
+        <div id="tableWrap"></div>
+      </div>
+      <div class="panel-foot" style="justify-content:space-between;">
+        <div style="display:flex; gap:8px;">
+          <button class="btn small" id="exportBtn" type="button">書き出し(JSON)</button>
+          <button class="btn small" id="importBtn" type="button">読み込み(JSON)</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none;">
+        </div>
+        <button class="btn primary" id="addMfcBtn" type="button">+ MFCを登録</button>
+      </div>
+    </section>
+
+    <!-- 右: 選定パネル -->
+    <section class="panel" id="selectPanel">
+      <div class="panel-head">
+        <h2>選定条件を入力</h2>
+      </div>
+      <div class="panel-body">
+
+        <div class="tabbar">
+          <button class="tab-btn active" data-tab="manual" type="button">流量で指定</button>
+          <button class="tab-btn" data-tab="burner" type="button">流速(DNBバーナー)で指定</button>
+        </div>
+
+        <!-- タブ1: 流量で直接指定 -->
+        <div class="tab-panel active" id="tab-manual">
+          <div class="field-row">
+            <label class="field">
+              <span class="lab">目標流量</span>
+              <input type="number" id="qFlow" class="mono" step="any" placeholder="例: 45">
+            </label>
+            <label class="field">
+              <span class="lab">単位</span>
+              <select id="qUnit" class="mono">
+                <option value="L/min" selected>L/min</option>
+                <option value="sccm">sccm</option>
+                <option value="slm">slm</option>
+                <option value="mL/min">mL/min</option>
+              </select>
+            </label>
+          </div>
+          <label class="field">
+            <span class="lab">ガス種</span>
+            <input type="text" id="qGas" placeholder="例: N2, Ar, H2 ...">
+          </label>
+        </div>
+
+        <!-- タブ2: DNBバーナー流速から算出 -->
+        <div class="tab-panel" id="tab-burner">
+          <div class="subgroup" style="border-top:none; margin-top:0;">
+            <div class="lab" style="font-weight:700; margin-bottom:6px;">バーナー形状(Coaxial Dual Nozzle Burner)</div>
+            <div class="field-row3">
+              <label class="field">
+                <span class="lab">主流ノズル内径</span>
+                <input type="number" id="dMain" class="mono" step="any" placeholder="例: 10">
+              </label>
+              <label class="field">
+                <span class="lab">環状ノズル内径</span>
+                <input type="number" id="dAnnIn" class="mono" step="any" placeholder="例: 14">
+              </label>
+              <label class="field">
+                <span class="lab">環状ノズル外径</span>
+                <input type="number" id="dAnnOut" class="mono" step="any" placeholder="例: 20">
+              </label>
+            </div>
+            <div class="helptext">単位はすべて mm。環状ノズルは「内径」(主流管の外壁側)と「外径」で環の断面積を計算します。</div>
+            <div class="geo-readout" id="geoReadout"></div>
+          </div>
+
+          <fieldset class="stream-block">
+            <legend>主流(円管バーナー)</legend>
+            <div id="streamCfg-main"></div>
+          </fieldset>
+
+          <fieldset class="stream-block">
+            <legend>環状流(環状バーナー)</legend>
+            <div id="streamCfg-ann"></div>
+          </fieldset>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="lab">供給ライン2次圧</span>
+            <input type="number" id="qPress" class="mono" step="any" placeholder="例: 0.2">
+          </label>
+          <label class="field">
+            <span class="lab">圧力単位</span>
+            <select id="qPressUnit" class="mono">
+              <option value="MPa">MPa</option>
+              <option value="kPa">kPa</option>
+              <option value="bar">bar</option>
+              <option value="psi">psi</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span class="lab">必要な接続本数</span>
+          <input type="number" id="qPorts" class="mono" step="1" min="1" value="1">
+          <div class="helptext">ガス系統1本あたりに必要な本数(通常1)。全ガス系統・全流路に共通の値として使用します。</div>
+        </label>
+
+        <button class="btn primary block" id="runBtn" type="button">適合するMFCを探す</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 結果 -->
+  <section class="panel" id="resultPanel" style="margin-top:20px; display:none;">
+    <div class="panel-head"><h2>選定結果</h2></div>
+    <div class="panel-body" id="resultBody"></div>
+  </section>
+</div>
+
+<dialog id="mfcDialog">
+  <div class="dialog-head" id="dialogTitle">MFCを登録</div>
+  <div class="dialog-body">
+    <label class="field">
+      <span class="lab">名称・型番</span>
+      <input type="text" id="fName" placeholder="例: MFC-A / SEC-Z512">
+    </label>
+    <label class="field">
+      <span class="lab">ガス別の設定</span>
+      <div class="helptext" style="margin-top:0; margin-bottom:8px;">同じMFCでもガス種によって制御レンジ・レギュレータ2次圧が変わるため、扱うガスごとに登録してください。</div>
+    </label>
+    <div id="gasConfigRows"></div>
+    <button class="btn small" id="addGasRowBtn" type="button" style="margin-bottom:14px;">+ ガスを追加</button>
+    <label class="field">
+      <span class="lab">対応可能な接続本数</span>
+      <input type="number" id="fPorts" class="mono" step="1" min="1" value="1">
+      <div class="helptext">同時に分岐供給できる最大ライン数(通常は1)</div>
+    </label>
+    <label class="field">
+      <span class="lab">備考</span>
+      <input type="text" id="fNote" placeholder="例: 装置Aの反応炉ライン専用">
+    </label>
+  </div>
+  <div class="dialog-foot">
+
+    <button class="btn ghost" id="cancelDialog" type="button">キャンセル</button>
+    <button class="btn primary" id="saveDialog" type="button">保存</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'mfc-inventory-v1';
+  let mfcs = [];
+  let editingId = null;
+
+  const PRESSURE_TO_KPA = { MPa: 1000, kPa: 1, bar: 100, psi: 6.89476 };
+  const FLOW_TO_SCCM = { sccm: 1, 'mL/min': 1, slm: 1000, 'L/min': 1000 };
+
+  function toKPa(v, unit){ return v * (PRESSURE_TO_KPA[unit] || 1); }
+  function toSccm(v, unit){ return v * (FLOW_TO_SCCM[unit] || 1); }
+  function fmtFlowLmin(sccm){ return (sccm / 1000).toFixed(3) + ' L/min'; }
+  function fmtFlowRangeLmin(minSccm, maxSccm){
+    const lo = (minSccm / 1000).toFixed(3);
+    const hi = (maxSccm / 1000).toFixed(3);
+    return lo === hi ? lo + ' L/min' : lo + ' &ndash; ' + hi + ' L/min';
+  }
+  function uid(){ return 'm' + Math.random().toString(36).slice(2, 10); }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  /* ---------- 燃料データベース(化学量論計算用) ---------- */
+  // CxHyOz + (x + y/4 - z/2) O2 -> x CO2 + y/2 H2O
+  const FUEL_DB = {
+    CH4:   { C:1, H:4, O:0, label:'CH4(メタン)' },
+    C3H8:  { C:3, H:8, O:0, label:'C3H8(プロパン)' },
+    C2H4:  { C:2, H:4, O:0, label:'C2H4(エチレン)' },
+    C2H6:  { C:2, H:6, O:0, label:'C2H6(エタン)' },
+    C3H6:  { C:3, H:6, O:0, label:'C3H6(プロピレン)' },
+    H2:    { C:0, H:2, O:0, label:'H2(水素)' },
+    CO:    { C:1, H:0, O:1, label:'CO(一酸化炭素)' },
+    CH3OH: { C:1, H:4, O:1, label:'CH3OH(メタノール)' },
+    custom:{ C:null, H:null, O:null, label:'カスタム(組成を入力)' }
+  };
+  const AIR_O2_FRACTION = 0.21;
+
+  function stoichO2(fuelDef){
+    return fuelDef.C + fuelDef.H/4 - fuelDef.O/2;
+  }
+
+  /* ---------- 永続化 ---------- */
+  function migrateRecord(m){
+    if (!m.gasConfigs && Array.isArray(m.gases)) {
+      m.gasConfigs = m.gases.map(g => ({ gas: g, min: m.min || 0, max: m.max, unit: m.unit || 'L/min' }));
+      delete m.gases; delete m.min; delete m.max; delete m.unit;
+    }
+    if (!Array.isArray(m.gasConfigs)) m.gasConfigs = [];
+    if (m.pPress === undefined && (m.pMin !== undefined || m.pMax !== undefined)) {
+      const lo = m.pMin !== undefined ? m.pMin : m.pMax;
+      const hi = m.pMax !== undefined ? m.pMax : m.pMin;
+      m.pPress = (lo + hi) / 2;
+      delete m.pMin; delete m.pMax;
+    }
+    // 前回検定日: 旧・MFC単位(m.calDate) → 新・ガス単位(g.calDate) へ移行
+    m.gasConfigs.forEach(g => {
+      if (g.calDate === undefined) g.calDate = m.calDate || '';
+    });
+    delete m.calDate;
+    // レギュレータ2次圧: 旧・MFC単位(m.pPress/m.pUnit) → 新・ガス単位(g.pPress/g.pUnit) へ移行
+    m.gasConfigs.forEach(g => {
+      if (g.pPress === undefined) g.pPress = m.pPress !== undefined ? m.pPress : 0;
+      if (g.pUnit === undefined) g.pUnit = m.pUnit || 'MPa';
+    });
+    delete m.pPress; delete m.pUnit;
+    // 制御PC入力用の傾き・切片: 未設定のものは恒等(傾き1・切片0)を初期値とする
+    m.gasConfigs.forEach(g => {
+      if (g.slope === undefined || g.slope === null || g.slope === '') g.slope = 1;
+      if (g.intercept === undefined || g.intercept === null || g.intercept === '') g.intercept = 0;
+    });
+    return m;
+  }
+
+  // 配布用にMFCデータを同梱する場合は、ここに書き出したJSON配列をそのまま貼り付ける。
+  // 空配列のままなら通常通り「未登録」の状態で始まる。
+  const DEFAULT_SEED_DATA = [
+  {
+    "id": "m8xj8ppma",
+    "name": "チーモ",
+    "gasConfigs": [
+      {
+        "gas": "Air",
+        "min": 9.93,
+        "max": 25.53,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2025-03-17",
+        "slope": 5.7775,
+        "intercept": -0.2995
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "mzfxs7nyk",
+    "name": "レンレン",
+    "gasConfigs": [
+      {
+        "gas": "CH4",
+        "min": 0.089,
+        "max": 0.445,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2026-06-17",
+        "slope": 0.1081,
+        "intercept": 0.0006
+      },
+      {
+        "gas": "Air",
+        "min": 0.071,
+        "max": 0.707,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "",
+        "slope": 0.1428,
+        "intercept": 0.0005
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "m2rp8ili2",
+    "name": "オノ",
+    "gasConfigs": [
+      {
+        "gas": "Air",
+        "min": 0.471,
+        "max": 4.71,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-07-06",
+        "slope": 1.0135,
+        "intercept": -0.0012
+      },
+      {
+        "gas": "CH4",
+        "min": 0.485,
+        "max": 3.761,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2025-03-23",
+        "slope": 0.7992,
+        "intercept": -0.0036
+      },
+      {
+        "gas": "C3H8",
+        "min": 0.44,
+        "max": 1.7393,
+        "unit": "sccm",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-02-23",
+        "slope": 0.3705,
+        "intercept": -0.0076
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "ma2qhsncg",
+    "name": "コイシ",
+    "gasConfigs": [
+      {
+        "gas": "CH4",
+        "min": 0.178,
+        "max": 0.534,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2026-06-16",
+        "slope": 0.1101,
+        "intercept": 0.0009
+      },
+      {
+        "gas": "C3H8",
+        "min": 0.0256,
+        "max": 0.2422,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-02-23",
+        "slope": 0.0511,
+        "intercept": 0.002
+      },
+      {
+        "gas": "Ar",
+        "min": 0.107,
+        "max": 0.812,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 0.1937,
+        "intercept": 0.0092
+      },
+      {
+        "gas": "He",
+        "min": 0.098,
+        "max": 0.9,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 0.2025,
+        "intercept": 0.0023
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "m3uj8w1po",
+    "name": "マツテツ",
+    "gasConfigs": [
+      {
+        "gas": "CH4",
+        "min": 0.623,
+        "max": 1.069,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2026-06-16",
+        "slope": 0.9822,
+        "intercept": -0.0529
+      },
+      {
+        "gas": "C3H8",
+        "min": 0.623,
+        "max": 1.66,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-02-23",
+        "slope": 0.4698,
+        "intercept": -0.0313
+      },
+      {
+        "gas": "Ar",
+        "min": 2.704,
+        "max": 8.033,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 1.7834,
+        "intercept": -0.0058
+      },
+      {
+        "gas": "He",
+        "min": 2.654,
+        "max": 7.241,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 1.8256,
+        "intercept": -0.042
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "mjjycnw6b",
+    "name": "ダイスケ",
+    "gasConfigs": [
+      {
+        "gas": "CH4",
+        "min": 2.636,
+        "max": 8.319,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2025-03-23",
+        "slope": 1.7582,
+        "intercept": 0.0019
+      },
+      {
+        "gas": "C3H8",
+        "min": 1.462,
+        "max": 3.286,
+        "unit": "L/min",
+        "pPress": 0.075,
+        "pUnit": "MPa",
+        "calDate": "2024-02-20",
+        "slope": 0.7848,
+        "intercept": -0.0056
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "m2l1cm1i9",
+    "name": "サイトウ",
+    "gasConfigs": [
+      {
+        "gas": "Air",
+        "min": 2.36,
+        "max": 9.42,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2025-03-17",
+        "slope": 2.1849,
+        "intercept": -0.0303
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "m9dofysg0",
+    "name": "オオノ",
+    "gasConfigs": [
+      {
+        "gas": "Air",
+        "min": 9.891,
+        "max": 19.55,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2025-03-17",
+        "slope": 4.4342,
+        "intercept": -0.4585
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "m44vynhyi",
+    "name": "ニッタショウ",
+    "gasConfigs": [
+      {
+        "gas": "Air",
+        "min": 42.39,
+        "max": 108.33,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2026-06-10",
+        "slope": 41.85,
+        "intercept": 0.7646
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "mekj8yb1w",
+    "name": "アオヤギ",
+    "gasConfigs": [
+      {
+        "gas": "CH4",
+        "min": 0.058,
+        "max": 0.452,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-02-22",
+        "slope": 0.1018,
+        "intercept": -0.0012
+      },
+      {
+        "gas": "C3H8",
+        "min": 0.0229,
+        "max": 0.2207,
+        "unit": "L/min",
+        "pPress": 0.12,
+        "pUnit": "MPa",
+        "calDate": "2024-02-23",
+        "slope": 0.0468,
+        "intercept": -0.001
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  },
+  {
+    "id": "mq7x774dt",
+    "name": "サワダ",
+    "gasConfigs": [
+      {
+        "gas": "Ar",
+        "min": 0.705,
+        "max": 4.004,
+        "unit": "L/min",
+        "pPress": 0.075,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 0.9263,
+        "intercept": -0.0328
+      },
+      {
+        "gas": "He",
+        "min": 0.802,
+        "max": 4.097,
+        "unit": "L/min",
+        "pPress": 0.075,
+        "pUnit": "MPa",
+        "calDate": "2019-02-28",
+        "slope": 0.9776,
+        "intercept": -0.0814
+      }
+    ],
+    "ports": 1,
+    "note": ""
+  }
+];
+
+  function loadData(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) mfcs = JSON.parse(raw).map(migrateRecord);
+      else if (DEFAULT_SEED_DATA.length > 0) mfcs = DEFAULT_SEED_DATA.map(migrateRecord);
+    } catch (e) { mfcs = []; }
+    renderTable();
+  }
+  function saveData(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(mfcs)); }
+    catch (e) { showToast('この端末のブラウザへの保存に失敗しました'); }
+  }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ---------- MFC一覧 表示 ---------- */
+  function renderTable(){
+    const wrap = document.getElementById('tableWrap');
+    document.getElementById('mfcCount').textContent = mfcs.length + '台';
+    if (mfcs.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">まだMFCが登録されていません。<br>「MFCを登録」から保有機器を追加してください。</div>';
+      return;
+    }
+    let html = '<table class="mfc-table"><thead><tr>' +
+      '<th>名称</th><th>ガス別レンジ・2次圧・検定日</th><th>本数</th><th></th>' +
+      '</tr></thead><tbody>';
+    mfcs.forEach(m => {
+      const gasLines = m.gasConfigs.map(g =>
+        '<div><span class="mono">'+escapeHtml(g.gas)+'</span>: '+g.min+'&ndash;'+g.max+' '+g.unit+
+        ' / 2次圧 '+g.pPress+' '+g.pUnit+
+        ' / 傾き '+g.slope+' 切片 '+g.intercept+
+        ' <span class="note">('+(g.calDate ? '検定: '+escapeHtml(g.calDate) : '検定日未登録')+')</span></div>'
+      ).join('');
+      html += '<tr>' +
+        '<td><div class="name">'+escapeHtml(m.name)+'</div>'+(m.note ? '<div class="note">'+escapeHtml(m.note)+'</div>' : '')+'</td>' +
+        '<td class="num">'+gasLines+'</td>' +
+        '<td class="num">'+m.ports+'</td>' +
+        '<td><div class="row-actions">' +
+          '<button class="icon-btn" data-edit="'+m.id+'" type="button">編集</button>' +
+          '<button class="icon-btn danger" data-del="'+m.id+'" type="button">削除</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openDialog(b.getAttribute('data-edit'))));
+    wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteMfc(b.getAttribute('data-del'))));
+  }
+
+  /* ---------- ガス別レンジ 行のUI ---------- */
+  function gasRowHtml(cfg){
+    cfg = cfg || { gas: '', min: 0, max: '', unit: 'L/min', pPress: '', pUnit: 'MPa', calDate: '', slope: 1, intercept: 0 };
+    const slopeVal = (cfg.slope === undefined || cfg.slope === null || cfg.slope === '') ? 1 : cfg.slope;
+    const interceptVal = (cfg.intercept === undefined || cfg.intercept === null || cfg.intercept === '') ? 0 : cfg.intercept;
+    return ''
+      + '<div class="gas-card">'
+      +   '<div class="gas-card-head">'
+      +     '<input type="text" class="gr-gas mono" value="'+escapeHtml(cfg.gas)+'" placeholder="ガス種(例: N2)">'
+      +     '<button class="icon-btn danger g-del" type="button" title="このガスを削除">✕ 削除</button>'
+      +   '</div>'
+      +   '<div class="gas-card-grid">'
+      +     '<div class="g-field"><span class="lab">下限</span><input type="number" class="gr-min mono" step="any" value="'+cfg.min+'"></div>'
+      +     '<div class="g-field"><span class="lab">上限(FS)</span><input type="number" class="gr-max mono" step="any" value="'+cfg.max+'" placeholder="例: 100"></div>'
+      +     '<div class="g-field"><span class="lab">単位</span><select class="gr-unit mono">'
+      +       ['L/min','sccm','slm','mL/min'].map(u => '<option value="'+u+'"'+(u===cfg.unit?' selected':'')+'>'+u+'</option>').join('')
+      +     '</select></div>'
+      +   '</div>'
+      +   '<div class="gas-card-grid press-row">'
+      +     '<div class="g-field"><span class="lab">レギュレータ2次圧</span><input type="number" class="gr-press mono" step="any" value="'+cfg.pPress+'" placeholder="例: 0.2"></div>'
+      +     '<div class="g-field"><span class="lab">圧力単位</span><select class="gr-punit mono">'
+      +       ['MPa','kPa','bar','psi'].map(u => '<option value="'+u+'"'+(u===cfg.pUnit?' selected':'')+'>'+u+'</option>').join('')
+      +     '</select></div>'
+      +     '<div class="g-field"><span class="lab">前回検定日</span><input type="date" class="gr-cal mono" value="'+escapeHtml(cfg.calDate||'')+'"></div>'
+      +   '</div>'
+      +   '<div class="gas-card-grid press-row">'
+      +     '<div class="g-field"><span class="lab">制御PC入力: 傾き</span><input type="number" class="gr-slope mono" step="any" value="'+slopeVal+'" placeholder="例: 1.02"></div>'
+      +     '<div class="g-field"><span class="lab">制御PC入力: 切片</span><input type="number" class="gr-intercept mono" step="any" value="'+interceptVal+'" placeholder="例: 0.03"></div>'
+      +   '</div>'
+      + '</div>';
+  }
+  function addGasRow(cfg){
+    const container = document.getElementById('gasConfigRows');
+    const div = document.createElement('div');
+    div.innerHTML = gasRowHtml(cfg);
+    const rowEl = div.firstElementChild;
+    rowEl.querySelector('.g-del').addEventListener('click', () => rowEl.remove());
+    container.appendChild(rowEl);
+  }
+  document.getElementById('addGasRowBtn').addEventListener('click', () => addGasRow(null));
+
+  function collectGasRows(){
+    const rows = Array.from(document.querySelectorAll('#gasConfigRows .gas-card'));
+    return rows.map(r => {
+      const slopeRaw = parseFloat(r.querySelector('.gr-slope').value);
+      const interceptRaw = parseFloat(r.querySelector('.gr-intercept').value);
+      return {
+        gas: r.querySelector('.gr-gas').value.trim(),
+        min: parseFloat(r.querySelector('.gr-min').value) || 0,
+        max: parseFloat(r.querySelector('.gr-max').value),
+        unit: r.querySelector('.gr-unit').value,
+        pPress: parseFloat(r.querySelector('.gr-press').value),
+        pUnit: r.querySelector('.gr-punit').value,
+        calDate: r.querySelector('.gr-cal').value,
+        slope: isNaN(slopeRaw) ? 1 : slopeRaw,
+        intercept: isNaN(interceptRaw) ? 0 : interceptRaw
+      };
+    }).filter(g => g.gas && !isNaN(g.max) && !isNaN(g.pPress));
+  }
+
+  function openDialog(id){
+    editingId = id || null;
+    const dialog = document.getElementById('mfcDialog');
+    document.getElementById('dialogTitle').textContent = id ? 'MFCを編集' : 'MFCを登録';
+    document.getElementById('gasConfigRows').innerHTML = '';
+    if (id) {
+      const m = mfcs.find(x => x.id === id);
+      document.getElementById('fName').value = m.name;
+      m.gasConfigs.forEach(cfg => addGasRow(cfg));
+      document.getElementById('fPorts').value = m.ports;
+      document.getElementById('fNote').value = m.note || '';
+    } else {
+      ['fName','fNote'].forEach(id2 => document.getElementById(id2).value = '');
+      addGasRow(null);
+      document.getElementById('fPorts').value = 1;
+    }
+    dialog.showModal();
+  }
+
+  function deleteMfc(id){
+    const m = mfcs.find(x => x.id === id);
+    if (!m) return;
+    if (!confirm(m.name + ' を削除しますか?')) return;
+    mfcs = mfcs.filter(x => x.id !== id);
+    saveData(); renderTable();
+  }
+
+  document.getElementById('addMfcBtn').addEventListener('click', () => openDialog(null));
+
+  document.getElementById('exportBtn').addEventListener('click', async () => {
+    if (mfcs.length === 0) { showToast('登録されているMFCがありません'); return; }
+    const ts = new Date().toISOString().slice(0, 10);
+    const filename = 'mfc-inventory-' + ts + '.json';
+    const jsonText = JSON.stringify(mfcs, null, 2);
+
+    // Artifactとして公開されている場合はdownloads capability経由、
+    // 単体のHTMLファイルとして開いている場合は通常のダウンロードリンクで保存する。
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        const downloads = await window.claude.use('downloads');
+        if (downloads) {
+          await downloads.save({ filename, data: jsonText });
+          showToast('書き出しました');
+          return;
+        }
+      }
+    } catch (err) {
+      if (err && err.code === 'declined') { return; }
+      // capability経由で失敗した場合は下の通常ダウンロードにフォールバック
+    }
+
+    const blob = new Blob([jsonText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('書き出しました');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!Array.isArray(data)) throw new Error('invalid format');
+        const incoming = data.map(migrateRecord);
+        const merge = mfcs.length > 0
+          ? confirm('既に' + mfcs.length + '台登録されています。読み込んだ' + incoming.length + '台を追加しますか?\n(キャンセルすると、既存のデータを置き換えます)')
+          : true;
+        if (merge) {
+          incoming.forEach(m => { m.id = uid(); }); // 追加時はID重複を避ける
+          mfcs = mfcs.concat(incoming);
+        } else {
+          mfcs = incoming;
+        }
+        saveData(); renderTable();
+        showToast('読み込みました(' + incoming.length + '台)');
+      } catch (err) {
+        showToast('JSONの読み込みに失敗しました');
+      }
+      document.getElementById('importFile').value = '';
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById('cancelDialog').addEventListener('click', () => document.getElementById('mfcDialog').close());
+  document.getElementById('saveDialog').addEventListener('click', () => {
+    const name = document.getElementById('fName').value.trim();
+    const gasConfigs = collectGasRows();
+    const ports = parseInt(document.getElementById('fPorts').value, 10) || 1;
+    const note = document.getElementById('fNote').value.trim();
+
+    if (!name || gasConfigs.length === 0) {
+      showToast('名称と、ガスごとのレンジ・2次圧(1件以上)は必須です');
+      return;
+    }
+    const record = { id: editingId || uid(), name, gasConfigs, ports, note };
+    if (editingId) mfcs = mfcs.map(m => m.id === editingId ? record : m);
+    else mfcs.push(record);
+    saveData(); renderTable();
+    document.getElementById('mfcDialog').close();
+    showToast(editingId ? '更新しました' : '登録しました');
+  });
+
+  /* ---------- タブ切替 ---------- */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('active');
+    });
+  });
+
+  /* ---------- DNBバーナー: ストリーム設定UIの構築 ---------- */
+  function fuelOptionsHtml(selected){
+    return Object.keys(FUEL_DB).map(k =>
+      '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+FUEL_DB[k].label+'</option>'
+    ).join('');
+  }
+  function gasRoleOptionsHtml(){
+    // 拡散火炎の「主ガス」= 燃料DB ∪ {Air, O2}
+    let opts = Object.keys(FUEL_DB).map(k => '<option value="'+k+'">'+FUEL_DB[k].label+'</option>').join('');
+    opts += '<option value="Air">Air(空気)</option><option value="O2">O2(純酸素)</option>';
+    return opts;
+  }
+
+  const SPLIT_ROLE = { main: 'oxidizer', ann: 'fuel' };
+  const SPLIT_ROLE_LABEL = { oxidizer: '酸化剤', fuel: '燃料' };
+
+  function streamConfigHtml(p){
+    const splitLabel = SPLIT_ROLE_LABEL[SPLIT_ROLE[p]];
+    return ''
+      + '<div class="helptext" style="margin-bottom:14px; padding:8px 10px; background:var(--panel-2); border-radius:var(--radius);">'
+      +   splitLabel+'ラインは、登録済みMFCのレンジで単一機では対応できない流量の場合、自動的に2分岐(2台のMFCで半量ずつ制御)して判定します。'
+      + '</div>'
+      + '<label class="field">'
+      +   '<span class="lab">火炎タイプ</span>'
+      +   '<select id="'+p+'FlameType" class="mono">'
+      +     '<option value="premixed">予混合</option>'
+      +     '<option value="diffusion">拡散</option>'
+      +   '</select>'
+      + '</label>'
+      + '<div class="field-row3">'
+      +   '<label class="field"><span class="lab">流速(下限)</span><input type="number" id="'+p+'VelocityMin" class="mono" step="any" placeholder="例: 0.3"></label>'
+      +   '<label class="field"><span class="lab">流速(上限)</span><input type="number" id="'+p+'VelocityMax" class="mono" step="any" placeholder="例: 0.8"></label>'
+      +   '<label class="field"><span class="lab">単位</span><select id="'+p+'VelUnit" class="mono"><option value="m/s">m/s</option><option value="cm/s">cm/s</option></select></label>'
+      + '</div>'
+      + '<div class="helptext" style="margin-top:-6px; margin-bottom:12px;">同じ値を上下限に入れれば単一流速として扱われます。範囲内のどの流速でも使えるMFCを探します。</div>'
+
+      + '<div class="subgroup" id="'+p+'PremixGroup">'
+      +   '<label class="field"><span class="lab">燃料</span><select id="'+p+'Fuel" class="mono">'+fuelOptionsHtml()+'</select></label>'
+      +   '<div class="field-row3" id="'+p+'FuelCustomGroup" style="display:none;">'
+      +     '<label class="field"><span class="lab">C数</span><input type="number" id="'+p+'FuelC" class="mono" step="1" min="0" value="0"></label>'
+      +     '<label class="field"><span class="lab">H数</span><input type="number" id="'+p+'FuelH" class="mono" step="1" min="0" value="0"></label>'
+      +     '<label class="field"><span class="lab">O数</span><input type="number" id="'+p+'FuelO" class="mono" step="1" min="0" value="0"></label>'
+      +   '</div>'
+      +   '<div class="field-row">'
+      +     '<label class="field"><span class="lab">酸化剤</span><select id="'+p+'Oxidizer" class="mono"><option value="Air">Air(空気)</option><option value="O2">O2(純酸素)</option></select></label>'
+      +     '<label class="field"><span class="lab">当量比 &phi;</span><input type="number" id="'+p+'Phi" class="mono" step="any" placeholder="例: 1.0"></label>'
+      +   '</div>'
+      + '</div>'
+
+      + '<div class="subgroup" id="'+p+'DiffGroup" style="display:none;">'
+      +   '<label class="field"><span class="lab">主ガス</span><select id="'+p+'MainGas" class="mono">'+gasRoleOptionsHtml()+'</select></label>'
+      +   '<div class="field-row3" id="'+p+'MainCustomGroup" style="display:none;">'
+      +     '<label class="field"><span class="lab">C数</span><input type="number" id="'+p+'MainC" class="mono" step="1" min="0" value="0"></label>'
+      +     '<label class="field"><span class="lab">H数</span><input type="number" id="'+p+'MainH" class="mono" step="1" min="0" value="0"></label>'
+      +     '<label class="field"><span class="lab">O数</span><input type="number" id="'+p+'MainO" class="mono" step="1" min="0" value="0"></label>'
+      +   '</div>'
+      +   '<div class="field-row">'
+      +     '<label class="field"><span class="lab">濃度(希釈ガス中のvol%)</span><input type="number" id="'+p+'Conc" class="mono" step="any" min="0" max="100" value="100"></label>'
+      +     '<label class="field"><span class="lab">希釈ガス</span><select id="'+p+'DiluentGas" class="mono"><option value="N2">N2</option><option value="CO2">CO2</option><option value="Ar">Ar</option><option value="Air">Air</option></select></label>'
+      +   '</div>'
+      +   '<div class="helptext">濃度100%なら希釈なし(主ガス単体)。100%未満で残りを希釈ガスで補います。</div>'
+      + '</div>';
+  }
+
+  ['main','ann'].forEach(p => {
+    document.getElementById('streamCfg-' + p).innerHTML = streamConfigHtml(p);
+
+    document.getElementById(p+'FlameType').addEventListener('change', (e) => {
+      const isPremix = e.target.value === 'premixed';
+      document.getElementById(p+'PremixGroup').style.display = isPremix ? '' : 'none';
+      document.getElementById(p+'DiffGroup').style.display = isPremix ? 'none' : '';
+    });
+    document.getElementById(p+'Fuel').addEventListener('change', (e) => {
+      document.getElementById(p+'FuelCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
+    });
+    document.getElementById(p+'MainGas').addEventListener('change', (e) => {
+      document.getElementById(p+'MainCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
+    });
+  });
+
+  /* ---------- バーナー形状: 断面積の読み出し表示 ---------- */
+  function mm2ToM2(mm2){ return mm2 * 1e-6; }
+  function circleAreaMm2(d){ return Math.PI/4 * d*d; }
+  function annulusAreaMm2(dIn, dOut){ return Math.PI/4 * (dOut*dOut - dIn*dIn); }
+
+  function updateGeoReadout(){
+    const dMain = parseFloat(document.getElementById('dMain').value);
+    const dAnnIn = parseFloat(document.getElementById('dAnnIn').value);
+    const dAnnOut = parseFloat(document.getElementById('dAnnOut').value);
+    const box = document.getElementById('geoReadout');
+    let html = '';
+    if (!isNaN(dMain) && dMain > 0) {
+      html += '<div><div class="g-lab">主流断面積</div><div class="g-val">'+circleAreaMm2(dMain).toFixed(2)+' mm&sup2;</div></div>';
+    }
+    if (!isNaN(dAnnIn) && !isNaN(dAnnOut) && dAnnOut > dAnnIn) {
+      html += '<div><div class="g-lab">環状流断面積</div><div class="g-val">'+annulusAreaMm2(dAnnIn, dAnnOut).toFixed(2)+' mm&sup2;</div></div>';
+    } else if (!isNaN(dAnnIn) && !isNaN(dAnnOut)) {
+      html += '<div><div class="g-lab" style="color:var(--bad);">環状流断面積</div><div class="g-val" style="color:var(--bad);">外径は内径より大きくしてください</div></div>';
+    }
+    box.innerHTML = html;
+  }
+  ['dMain','dAnnIn','dAnnOut'].forEach(id => document.getElementById(id).addEventListener('input', updateGeoReadout));
+
+  /* ---------- 燃焼条件 → 必要ガス流量(sccm)への変換 ---------- */
+  function getFuelDefFromSelect(p){
+    const key = document.getElementById(p+'Fuel').value;
+    if (key === 'custom') {
+      return {
+        C: parseFloat(document.getElementById(p+'FuelC').value) || 0,
+        H: parseFloat(document.getElementById(p+'FuelH').value) || 0,
+        O: parseFloat(document.getElementById(p+'FuelO').value) || 0,
+        name: 'カスタム燃料'
+      };
+    }
+    const d = FUEL_DB[key];
+    return { C: d.C, H: d.H, O: d.O, name: key };
+  }
+  function getMainGasFromSelect(p){
+    const key = document.getElementById(p+'MainGas').value;
+    if (key === 'Air' || key === 'O2') return { isFuel:false, name:key };
+    if (key === 'custom') {
+      return {
+        isFuel:true, name:'カスタム燃料',
+        C: parseFloat(document.getElementById(p+'MainC').value) || 0,
+        H: parseFloat(document.getElementById(p+'MainH').value) || 0,
+        O: parseFloat(document.getElementById(p+'MainO').value) || 0
+      };
+    }
+    const d = FUEL_DB[key];
+    return { isFuel:true, name:key, C:d.C, H:d.H, O:d.O };
+  }
+
+  function streamAreaMm2(p){
+    if (p === 'main') {
+      const d = parseFloat(document.getElementById('dMain').value);
+      return isNaN(d) ? null : circleAreaMm2(d);
+    } else {
+      const dIn = parseFloat(document.getElementById('dAnnIn').value);
+      const dOut = parseFloat(document.getElementById('dAnnOut').value);
+      if (isNaN(dIn) || isNaN(dOut) || dOut <= dIn) return null;
+      return annulusAreaMm2(dIn, dOut);
+    }
+  }
+
+  function streamFlowRangeSccm(p){
+    const areaMm2 = streamAreaMm2(p);
+    const velMinRaw = parseFloat(document.getElementById(p+'VelocityMin').value);
+    const velMaxRaw = parseFloat(document.getElementById(p+'VelocityMax').value);
+    if (areaMm2 === null || isNaN(velMinRaw) || isNaN(velMaxRaw)) return null;
+    const velUnit = document.getElementById(p+'VelUnit').value;
+    const toMs = v => velUnit === 'cm/s' ? v/100 : v;
+    const areaM2 = mm2ToM2(areaMm2);
+    const flowOf = velMs => velMs * areaM2 * 1e6 * 60; // m3/s -> mL/min ≈ sccm
+    const vLo = Math.min(velMinRaw, velMaxRaw);
+    const vHi = Math.max(velMinRaw, velMaxRaw);
+    return { min: flowOf(toMs(vLo)), max: flowOf(toMs(vHi)) };
+  }
+
+  function computeStreamComponents(p, streamLabel, forceSplit){
+    const totalRange = streamFlowRangeSccm(p);
+    if (totalRange === null) return { error: streamLabel + ': ノズル径と流速(下限・上限)を入力してください', components: [] };
+
+    const flameType = document.getElementById(p+'FlameType').value;
+    const components = [];
+
+    if (flameType === 'premixed') {
+      const fuel = getFuelDefFromSelect(p);
+      const oxType = document.getElementById(p+'Oxidizer').value; // Air / O2
+      const phi = parseFloat(document.getElementById(p+'Phi').value);
+      if (isNaN(phi) || phi <= 0) return { error: streamLabel + ': 当量比を入力してください', components: [] };
+
+      const a = stoichO2(fuel); // 1 mol燃料あたりの理論O2 mol数
+      if (a <= 0) return { error: streamLabel + ': 燃料の組成(C,H,O)を確認してください', components: [] };
+
+      const molO2 = a / phi;
+      const molOxSupply = oxType === 'O2' ? molO2 : molO2 / AIR_O2_FRACTION;
+      const totalMol = 1 + molOxSupply;
+      const fuelFrac = 1 / totalMol;
+      const oxFrac = molOxSupply / totalMol;
+
+      components.push({ label: streamLabel + ' / 燃料(' + fuel.name + ')', baseLabel: streamLabel + ' / 燃料(' + fuel.name + ')', gas: fuel.name, flowMin: totalRange.min * fuelFrac, flowMax: totalRange.max * fuelFrac, frac: fuelFrac, role: 'fuel' });
+      components.push({ label: streamLabel + ' / 酸化剤(' + oxType + ')', baseLabel: streamLabel + ' / 酸化剤(' + oxType + ')', gas: oxType, flowMin: totalRange.min * oxFrac, flowMax: totalRange.max * oxFrac, frac: oxFrac, role: 'oxidizer' });
+    } else {
+      const mg = getMainGasFromSelect(p);
+      const conc = parseFloat(document.getElementById(p+'Conc').value);
+      const concV = isNaN(conc) ? 100 : Math.min(100, Math.max(0, conc));
+      const diluent = document.getElementById(p+'DiluentGas').value;
+      const mainName = mg.name;
+      const mainRole = mg.isFuel ? 'fuel' : ((mainName === 'Air' || mainName === 'O2') ? 'oxidizer' : 'other');
+
+      const mainLabel = streamLabel + ' / 主ガス(' + mainName + ')';
+      components.push({ label: mainLabel, baseLabel: mainLabel, gas: mainName, flowMin: totalRange.min * (concV/100), flowMax: totalRange.max * (concV/100), frac: concV/100, role: mainRole });
+      if (concV < 100) {
+        const dilLabel = streamLabel + ' / 希釈(' + diluent + ')';
+        components.push({ label: dilLabel, baseLabel: dilLabel, gas: diluent, flowMin: totalRange.min * (1 - concV/100), flowMax: totalRange.max * (1 - concV/100), frac: 1 - concV/100, role: 'diluent' });
+      }
+    }
+
+    // 分岐(2台のMFCで半量ずつ制御)機構: 登録済みMFCのレンジで単一機対応が可能かどうかを自動判定
+    // forceSplit が明示的に指定されている場合はそれを優先する(他ラインとの競合を見た上での再判定用)
+    const splitRole = SPLIT_ROLE[p];
+    const expanded = [];
+    components.forEach(comp => {
+      comp.stream = p;
+      const isSplitRoleComp = comp.role === splitRole;
+      const doSplit = isSplitRoleComp && (forceSplit !== undefined ? forceSplit : (needsSplit(comp.gas, comp.flowMin, comp.flowMax) && !canPartitionCover(comp.gas, comp.flowMin, comp.flowMax)));
+      if (doSplit) {
+        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 1, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
+        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 2, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
+      } else {
+        comp.isSplitRole = isSplitRoleComp;
+        comp.autoSplit = false;
+        expanded.push(comp);
+      }
+    });
+    return { error: null, components: expanded };
+  }
+
+  // 指定ガス・流量範囲[flowMin, flowMax]を、登録済みMFCの単一機(ガス一致・レンジが範囲を包含・接続本数を満たす)でカバーできるかを判定。
+  function coverableBySingle(gas, flowMin, flowMax, portsNeeded){
+    const g = (gas || '').trim().toLowerCase();
+    return mfcs.some(m => {
+      if (portsNeeded !== undefined && portsNeeded > m.ports) return false;
+      return m.gasConfigs.some(cfg => {
+        if (cfg.gas.toLowerCase() !== g) return false;
+        const lo = toSccm(cfg.min, cfg.unit);
+        const hi = toSccm(cfg.max, cfg.unit);
+        return flowMin >= lo && flowMax <= hi;
+      });
+    });
+  }
+  // 対応できる機器が1つもなければ「分岐が必要」と判断する(接続本数・2次圧はここでは考慮しない簡易判定)。
+  function needsSplit(gas, flowMin, flowMax){
+    return !coverableBySingle(gas, flowMin, flowMax);
+  }
+  // 単一機では無理でも、範囲を分割して複数のMFCを切り替えて使えば(同時使用の分岐なしで)全範囲をカバーできるかを判定。
+  // これが可能なら、物理的な分岐(2台同時使用)より優先する。
+  function canPartitionCover(gas, flowMin, flowMax){
+    const part = buildRangePartition(gas, flowMin, flowMax, null, undefined);
+    return !!(part && part.complete);
+  }
+  // 半量にすれば単一MFCで対応可能になるかどうか(=分岐すれば解決するか)を判定
+  function wouldSplitHelp(gas, flowMin, flowMax, portsNeeded){
+    return coverableBySingle(gas, flowMin / 2, flowMax / 2, portsNeeded);
+  }
+
+  /* ---------- MFCマッチングのコアロジック(共通) ---------- */
+  function findGasConfig(m, gasQuery, flowMin, flowMax){
+    if (gasQuery) {
+      const q = gasQuery.trim().toLowerCase();
+      return m.gasConfigs.find(g => g.gas.toLowerCase() === q) || null;
+    }
+    // ガス未指定: 流量範囲がレンジ内にすべて収まる設定があればそれを、なければ先頭の設定を仮に使う
+    const fit = m.gasConfigs.find(g => flowMin >= toSccm(g.min, g.unit) && flowMax <= toSccm(g.max, g.unit));
+    return fit || m.gasConfigs[0] || null;
+  }
+
+  // 単一のMFCでは流量範囲[flowMin, flowMax]全体をカバーできない場合に、
+  // 範囲を区切って複数のMFCを使い分けることでカバーできないかを判定する(貪欲法による区間カバー)。
+  function buildRangePartition(gas, flowMin, flowMax, pressKPa, portsNeeded, excludeIds){
+    const g = (gas || '').trim().toLowerCase();
+    const eligible = [];
+    mfcs.forEach(m => {
+      if (excludeIds && excludeIds.has(m.id)) return;
+      if (portsNeeded > m.ports) return;
+      m.gasConfigs.forEach(cfg => {
+        if (cfg.gas.toLowerCase() !== g) return;
+        if (pressKPa !== null) {
+          const cfgPressKPa = toKPa(cfg.pPress, cfg.pUnit);
+          const tolKPa = Math.max(cfgPressKPa * 0.05, 2);
+          if (Math.abs(pressKPa - cfgPressKPa) > tolKPa) return;
+        }
+        eligible.push({ m, cfg, lo: toSccm(cfg.min, cfg.unit), hi: toSccm(cfg.max, cfg.unit) });
+      });
+    });
+    if (eligible.length === 0) return null;
+
+    const segments = [];
+    let current = flowMin;
+    const EPS = 1e-6;
+    while (current < flowMax - EPS) {
+      const covering = eligible.filter(e => e.lo <= current + EPS && e.hi > current + EPS);
+      if (covering.length === 0) {
+        return { segments, complete: false, gapStart: current };
+      }
+      covering.sort((a, b) => b.hi - a.hi); // 最も遠くまでカバーできるものを優先(切替回数を最小化)
+      const chosen = covering[0];
+      const segTo = Math.min(chosen.hi, flowMax);
+      if (segTo <= current + EPS) return { segments, complete: false, gapStart: current };
+      segments.push({ m: chosen.m, cfg: chosen.cfg, from: current, to: segTo });
+      current = segTo;
+    }
+    return { segments, complete: true };
+  }
+
+  // 流量(sccm)から、そのコンポーネントが属する系統の流速に逆算して表示用の文字列を作る
+  function flowToVelocityLabel(stream, frac, flowSccmVal){
+    const areaMm2 = streamAreaMm2(stream);
+    if (!areaMm2 || !frac) return null;
+    const totalFlowSccm = flowSccmVal / frac;
+    const areaM2 = mm2ToM2(areaMm2);
+    const velMs = totalFlowSccm / (areaM2 * 1e6 * 60);
+    const velUnitEl = document.getElementById(stream + 'VelUnit');
+    const velUnit = velUnitEl ? velUnitEl.value : 'm/s';
+    const velDisp = velUnit === 'cm/s' ? velMs * 100 : velMs;
+    return velDisp.toFixed(3) + ' ' + velUnit;
+  }
+
+  function matchMfcs(flowMin, flowMax, gasQuery, pressKPa, portsNeeded){
+    const candidates = [];
+    const excluded = [];
+    mfcs.forEach(m => {
+      const reasons = [];
+      let ok = true;
+      let gasOk = true, portsOk = true;
+
+      const cfg = findGasConfig(m, gasQuery, flowMin, flowMax);
+      const gasRegistered = gasQuery ? m.gasConfigs.some(g => g.gas.toLowerCase() === gasQuery.trim().toLowerCase()) : !!cfg;
+      if (gasQuery && !gasRegistered) {
+        ok = false; gasOk = false;
+        reasons.push('対応ガスに含まれません(登録ガス: ' + m.gasConfigs.map(g => g.gas).join(', ') + ')');
+      }
+      if (portsNeeded > m.ports) { ok = false; portsOk = false; reasons.push('接続本数が不足(対応: ' + m.ports + '本)'); }
+
+      let pctFSLow = 0, pctFSHigh = 0, overPct = 0, pressDeltaPct = 0;
+      let flowOk = true, pressOk = true;
+
+      if (cfg && gasOk) {
+        const mMinSccm = toSccm(cfg.min, cfg.unit);
+        const mMaxSccm = toSccm(cfg.max, cfg.unit);
+        if (flowMin < mMinSccm || flowMax > mMaxSccm) {
+          ok = false; flowOk = false;
+          reasons.push('目標流量(範囲)が' + cfg.gas + 'でのレンジ外(登録レンジ: ' + cfg.min + '–' + cfg.max + ' ' + cfg.unit + ')');
+          const overHigh = flowMax > mMaxSccm ? ((flowMax - mMaxSccm) / (mMaxSccm || 1)) * 100 : 0;
+          const overLow = flowMin < mMinSccm ? ((mMinSccm - flowMin) / (mMaxSccm || 1)) * 100 : 0;
+          overPct = Math.max(overHigh, overLow);
+        }
+        pctFSLow = mMaxSccm > 0 ? (flowMin / mMaxSccm) * 100 : 0;
+        pctFSHigh = mMaxSccm > 0 ? (flowMax / mMaxSccm) * 100 : 0;
+
+        if (pressKPa !== null) {
+          const cfgPressKPa = toKPa(cfg.pPress, cfg.pUnit);
+          const tolKPa = Math.max(cfgPressKPa * 0.05, 2); // ±5%(最低2kPa)を許容誤差として判定
+          if (Math.abs(pressKPa - cfgPressKPa) > tolKPa) {
+            ok = false; pressOk = false;
+            reasons.push('供給2次圧が不一致(' + cfg.gas + ': 対応 ' + cfg.pPress + ' ' + cfg.pUnit + ')');
+            pressDeltaPct = (Math.abs(pressKPa - cfgPressKPa) / cfgPressKPa) * 100;
+          }
+        }
+      } else if (!gasQuery && !cfg) {
+        ok = false; reasons.push('ガスのレンジが登録されていません');
+      }
+
+      if (ok) {
+        candidates.push({ m, cfg, pctFSLow, pctFSHigh, lowAccuracy: pctFSLow < 10 });
+      } else {
+        // ガス種・接続本数はハード制約(これがNGなら応急使用も不可)。流量レンジ・2次圧のみの不一致であれば応急候補になり得る。
+        const fallbackEligible = gasOk && portsOk && !!cfg && (!flowOk || !pressOk);
+        const score = fallbackEligible ? overPct * 2 + pressDeltaPct : null;
+        excluded.push({ m, cfg, reasons, fallbackEligible, score, pctFSLow, pctFSHigh });
+      }
+    });
+    candidates.sort((a, b) => {
+      if (a.lowAccuracy !== b.lowAccuracy) return a.lowAccuracy ? 1 : -1;
+      return b.pctFSHigh - a.pctFSHigh;
+    });
+
+    let finalExcluded = excluded;
+    if (candidates.length === 0) {
+      const eligible = excluded.filter(e => e.fallbackEligible);
+      if (eligible.length > 0) {
+        eligible.sort((a, b) => a.score - b.score);
+        const fb = eligible[0];
+        candidates.push({ m: fb.m, cfg: fb.cfg, pctFSLow: fb.pctFSLow, pctFSHigh: fb.pctFSHigh, lowAccuracy: fb.pctFSLow < 10, isFallback: true, reasons: fb.reasons });
+        finalExcluded = excluded.filter(e => e.m.id !== fb.m.id);
+      }
+    }
+    return { candidates, excluded: finalExcluded };
+  }
+
+  function candidateCardHtml(c, tagOverride){
+    const pctLo = Math.min(100, Math.max(0, c.pctFSLow));
+    const pctHi = Math.min(100, Math.max(0, c.pctFSHigh));
+    let cls, tagCls, tagText;
+    if (tagOverride) {
+      ({ cls, tagCls, tagText } = tagOverride);
+    } else if (c.isFallback) {
+      cls = 'caution'; tagCls = 'caution'; tagText = '応急的候補(要確認)';
+    } else {
+      cls = c.lowAccuracy ? 'caution' : '';
+      tagCls = c.lowAccuracy ? 'caution' : 'ok';
+      tagText = c.lowAccuracy ? '要注意(低レンジ)' : '候補';
+    }
+    const pctLabel = Math.abs(c.pctFSHigh - c.pctFSLow) < 0.05
+      ? c.pctFSHigh.toFixed(1) + '%'
+      : c.pctFSLow.toFixed(1) + '% &ndash; ' + c.pctFSHigh.toFixed(1) + '%';
+    return '<div class="result-card ' + cls + '">'
+      + '<div class="result-top"><div class="result-name">' + escapeHtml(c.m.name) + '</div><div class="result-tag ' + tagCls + '">' + tagText + '</div></div>'
+      + '<div class="result-meta">'
+      +   '<div><div class="m-lab">ガス / レンジ(FS)</div><div class="m-val">' + escapeHtml(c.cfg.gas) + ': ' + c.cfg.min + '&ndash;' + c.cfg.max + ' ' + c.cfg.unit + '</div></div>'
+      +   '<div><div class="m-lab">対応2次圧('+escapeHtml(c.cfg.gas)+')</div><div class="m-val">' + c.cfg.pPress + ' ' + c.cfg.pUnit + '</div></div>'
+      +   '<div><div class="m-lab">FSに対する割合</div><div class="m-val">' + pctLabel + '</div></div>'
+      + '</div>'
+      + '<div class="fs-bar"><div class="zone" style="left:10%; right:0;"></div><div class="fill" style="left:' + pctLo + '%; width:' + Math.max(pctHi - pctLo, 0.6) + '%;"></div></div>'
+      + '<div class="fs-caption"><span>0%</span><span>10%(推奨下限)</span><span>100% FS</span></div>'
+      + '<div style="margin-top:10px; padding:8px 10px; background:var(--accent-soft); border-radius:var(--radius); font-size:12.5px;">'
+      +   '<span style="color:var(--ink-soft);">制御PC入力値(' + escapeHtml(c.cfg.gas) + '): </span>'
+      +   '<span class="mono" style="font-weight:700; color:var(--accent-ink);">傾き ' + c.cfg.slope + ' &nbsp;/&nbsp; 切片 ' + c.cfg.intercept + '</span>'
+      + '</div>'
+      + (c.isFallback ? '<ul class="reason-list" style="color:var(--warn);"><li>厳密には条件を満たしません: ' + c.reasons.map(escapeHtml).join(' / ') + '</li></ul>' : '')
+      + (c.lowAccuracy && !c.isFallback ? '<ul class="reason-list"><li>流速下限側でFSの10%未満になるため、精度低下の可能性があります。より小レンジのMFCの利用も検討してください。</li></ul>' : '')
+      + (c.cfg.calDate ? '<ul class="reason-list"><li>前回検定日(' + escapeHtml(c.cfg.gas) + '): ' + escapeHtml(c.cfg.calDate) + '</li></ul>' : '<ul class="reason-list"><li>前回検定日(' + escapeHtml(c.cfg.gas) + '): 未登録</li></ul>')
+      + (c.m.note ? '<ul class="reason-list"><li>備考: ' + escapeHtml(c.m.note) + '</li></ul>' : '')
+    + '</div>';
+  }
+
+  function excludedBlockHtml(excluded){
+    if (excluded.length === 0) return '';
+    let html = '<details class="excluded-block"><summary>対象外だったMFC(' + excluded.length + '台)を見る</summary>';
+    excluded.forEach(e => { html += '<div class="excluded-item"><span class="nm">' + escapeHtml(e.m.name) + '</span> &mdash; ' + e.reasons.join(' / ') + '</div>'; });
+    html += '</details>';
+    return html;
+  }
+
+  // 単一クエリ(手動タブ)用: 重複調整なし、上位=推奨として表示
+  const NO_STRICT_MATCH_BANNER = '<div class="empty-state" style="text-align:left; background:var(--warn-soft); border:1px solid var(--warn); border-radius:var(--radius); padding:12px 14px; margin-bottom:12px; color:var(--ink);">厳密に条件を満たすMFCは見つかりませんでした。以下は応急的に検討できる候補です。条件を完全には満たしていないため、使用前に必ず内容を確認してください。</div>';
+
+  function buildResultHtml(candidates, excluded){
+    let html = '';
+    if (candidates.length === 0) {
+      html += '<div class="empty-state">条件に完全一致・応急的にも使えるMFCが見つかりませんでした。下の「対象外の理由」を確認してください。</div>';
+    } else {
+      const hasStrict = candidates.some(c => !c.isFallback);
+      if (!hasStrict) html += NO_STRICT_MATCH_BANNER;
+      candidates.forEach((c, i) => {
+        const isBest = i === 0;
+        if (c.isFallback) html += candidateCardHtml(c);
+        else if (isBest && !c.lowAccuracy) html += candidateCardHtml(c, { cls: 'best', tagCls: 'best', tagText: '推奨' });
+        else html += candidateCardHtml(c);
+      });
+    }
+    html += excludedBlockHtml(excluded);
+    return html;
+  }
+
+  // 複数ライン(DNBバーナータブ)用: 同一MFCが複数ラインに重複して推奨されないよう調整する
+  function resolveComponentAssignments(componentResults, seedUsedBy){
+    const targets = componentResults
+      .map((_, i) => i)
+      .filter(i => !componentResults[i].partition); // 範囲分割で使うMFCは別途予約済みのため対象外
+    const order = targets.sort((a, b) => componentResults[a].candidates.length - componentResults[b].candidates.length);
+    const usedBy = seedUsedBy || {}; // mfcId -> componentIndex
+    componentResults.forEach(cr => { if (!cr.partition) cr.assigned = null; });
+    order.forEach(idx => {
+      const cr = componentResults[idx];
+      const pick = cr.candidates.find(c => !(c.m.id in usedBy));
+      if (pick) { usedBy[pick.m.id] = idx; cr.assigned = pick; }
+    });
+    return usedBy;
+  }
+
+  // 範囲分割(同時使用ではなく途中で切り替える)で使うMFCを、他ラインとの重複が起きないよう先に確保する。
+  // 分割を必要とするライン(より制約が強い)を先に処理し、既に確保済みの機器は除外して再計算する。
+  function reservePartitionDevices(componentResults, pressKPa, portsNeeded){
+    const usedBy = {};
+    componentResults.forEach((cr, idx) => {
+      if (!cr.partition) return;
+      const excludeIds = new Set(Object.keys(usedBy));
+      const stillFree = cr.partition.segments.every(seg => !excludeIds.has(seg.m.id));
+      let part = cr.partition;
+      if (!stillFree) {
+        part = buildRangePartition(cr.comp.gas, cr.comp.flowMin, cr.comp.flowMax, pressKPa, portsNeeded, excludeIds);
+        cr.partition = part || { segments: [], complete: false, gapStart: cr.comp.flowMin };
+        part = cr.partition;
+      }
+      if (part && part.segments.length > 0) {
+        part.segments.forEach(seg => { usedBy[seg.m.id] = idx; });
+      }
+    });
+    return usedBy;
+  }
+
+  // 候補はあったが他ラインとの競合ですべて使われてしまった系統に、
+  // 除外リスト(レンジ外・2次圧不一致など)の中から、まだ使われていない最も近いMFCを応急候補として補充する。
+  function fillUnassignedWithFallback(componentResults, usedBy){
+    componentResults.forEach((cr, idx) => {
+      if (cr.assigned || cr.partition) return;
+      const pool = cr.excluded.filter(e => e.fallbackEligible && !(e.m.id in usedBy));
+      if (pool.length === 0) return;
+      pool.sort((a, b) => a.score - b.score);
+      const fb = pool[0];
+      const fbCandidate = { m: fb.m, cfg: fb.cfg, pctFSLow: fb.pctFSLow, pctFSHigh: fb.pctFSHigh, lowAccuracy: fb.pctFSLow < 10, isFallback: true, reasons: fb.reasons };
+      cr.candidates.push(fbCandidate);
+      cr.assigned = fbCandidate;
+      usedBy[fb.m.id] = idx;
+    });
+  }
+
+  function buildPartitionHtml(cr){
+    const { partition, comp } = cr;
+    let html = '<div style="padding:10px 12px; background:var(--accent-soft); border-radius:var(--radius); margin-bottom:12px; font-size:12.5px; color:var(--ink);">'
+      + '範囲分割の推奨: 単一のMFCでは指定した範囲全体をカバーできないため、下記のように途中でMFCを切り替える組み合わせを提案します。'
+      + '</div>';
+
+    partition.segments.forEach((seg, i) => {
+      const cfgMaxSccm = toSccm(seg.cfg.max, seg.cfg.unit);
+      const pctFSLow = cfgMaxSccm > 0 ? (seg.from / cfgMaxSccm) * 100 : 0;
+      const pctFSHigh = cfgMaxSccm > 0 ? (seg.to / cfgMaxSccm) * 100 : 0;
+      const fakeC = { m: seg.m, cfg: seg.cfg, pctFSLow, pctFSHigh, lowAccuracy: pctFSLow < 10 };
+      const velFrom = flowToVelocityLabel(comp.stream, comp.frac, seg.from);
+      const velTo = flowToVelocityLabel(comp.stream, comp.frac, seg.to);
+
+      html += '<div class="split-slot-label" style="margin-bottom:4px;">区間 ' + (i+1) + '</div>'
+        + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">'
+        +   '<div style="padding:8px 10px; background:var(--panel-2); border-radius:var(--radius);">'
+        +     '<div class="m-lab">流速</div>'
+        +     '<div class="mono" style="font-weight:700; font-size:13.5px;">' + (velFrom && velTo ? velFrom + ' &ndash; ' + velTo : '&mdash;') + '</div>'
+        +   '</div>'
+        +   '<div style="padding:8px 10px; background:var(--panel-2); border-radius:var(--radius);">'
+        +     '<div class="m-lab">流量</div>'
+        +     '<div class="mono" style="font-weight:700; font-size:13.5px;">' + fmtFlowRangeLmin(seg.from, seg.to) + '</div>'
+        +   '</div>'
+        + '</div>'
+        + candidateCardHtml(fakeC, { cls: '', tagCls: 'ok', tagText: '区間' + (i+1) + 'で使用' });
+
+      if (i < partition.segments.length - 1) {
+        const switchVel = flowToVelocityLabel(comp.stream, comp.frac, seg.to);
+        const switchFlow = fmtFlowLmin(seg.to);
+        html += '<div style="display:flex; align-items:center; gap:8px; margin:4px 0 12px; padding:6px 10px; border-left:3px solid var(--accent); background:var(--panel-2); border-radius:var(--radius); font-size:12px; color:var(--ink-soft);">'
+          + '<span style="font-weight:700; color:var(--accent-ink);">切替:</span>'
+          + '<span>流速 ' + (switchVel || '&mdash;') + '(流量 ' + switchFlow + ')に達したら、区間' + (i+1) + '&rarr;区間' + (i+2) + 'のMFCへ切り替えてください</span>'
+          + '</div>';
+      }
+    });
+
+    if (!partition.complete) {
+      html += '<div class="empty-state" style="text-align:left; background:var(--bad-soft); border:1px solid var(--bad); border-radius:var(--radius); padding:10px 12px; color:var(--ink);">'
+        + '流量 ' + fmtFlowLmin(partition.gapStart) + ' 以上の区間に対応できるMFCが見つからず、範囲の一部は未カバーです。登録漏れがないか確認するか、機器の追加をご検討ください。'
+        + '</div>';
+    }
+    return html;
+  }
+
+  function buildComponentResultHtml(cr, usedBy, selfIdx, labels){
+    const { candidates, excluded, assigned, partition } = cr;
+    if (partition) {
+      return buildPartitionHtml(cr) + excludedBlockHtml(excluded);
+    }
+    let html = '';
+    if (candidates.length === 0) {
+      html += '<div class="empty-state">条件に完全一致・応急的にも使えるMFCが見つかりませんでした(対応ガスまたは接続本数の制約で使用可能な機器がありません)。下の「対象外の理由」を確認してください。</div>';
+      html += excludedBlockHtml(excluded);
+      return html;
+    }
+    if (!assigned) {
+      html += '<div class="empty-state">条件に合うMFCはありますが、いずれも他のラインに割り当て済みで使用できません。物理的にMFCの台数が不足している可能性があります。</div>';
+    } else if (assigned.isFallback) {
+      html += NO_STRICT_MATCH_BANNER;
+    }
+    candidates.forEach(c => {
+      const ownerIdx = usedBy[c.m.id];
+      if (assigned && c.m.id === assigned.m.id) {
+        if (c.isFallback) html += candidateCardHtml(c);
+        else html += candidateCardHtml(c, c.lowAccuracy
+          ? { cls: 'caution', tagCls: 'caution', tagText: '要注意(低レンジ)' }
+          : { cls: 'best', tagCls: 'best', tagText: '推奨' });
+      } else if (ownerIdx !== undefined && ownerIdx !== selfIdx) {
+        html += candidateCardHtml(c, { cls: 'reserved', tagCls: 'reserved', tagText: '他ラインに割当済み(' + escapeHtml(labels[ownerIdx]) + ')' });
+      } else {
+        html += candidateCardHtml(c);
+      }
+    });
+    html += excludedBlockHtml(excluded);
+    return html;
+  }
+
+  /* ---------- 実行 ---------- */
+  function runSelection(){
+    if (mfcs.length === 0) { showToast('先にMFCを登録してください'); return; }
+
+    const pressVal = parseFloat(document.getElementById('qPress').value);
+    const pressUnit = document.getElementById('qPressUnit').value;
+    const pressKPa = isNaN(pressVal) ? null : toKPa(pressVal, pressUnit);
+    const portsNeeded = parseInt(document.getElementById('qPorts').value, 10) || 1;
+
+    const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+    const panel = document.getElementById('resultPanel');
+    const body = document.getElementById('resultBody');
+    panel.style.display = 'block';
+
+    if (activeTab === 'manual') {
+      const flowVal = parseFloat(document.getElementById('qFlow').value);
+      const flowUnit = document.getElementById('qUnit').value;
+      const gasQuery = document.getElementById('qGas').value.trim();
+      if (isNaN(flowVal)) { showToast('目標流量を入力してください'); return; }
+      const flowSccm = toSccm(flowVal, flowUnit);
+      const { candidates, excluded } = matchMfcs(flowSccm, flowSccm, gasQuery, pressKPa, portsNeeded);
+      body.innerHTML = buildResultHtml(candidates, excluded);
+    } else {
+      function buildBurnerResult(forceSplitMain, forceSplitAnn){
+        const mainRes = computeStreamComponents('main', '主流', forceSplitMain);
+        const annRes = computeStreamComponents('ann', '環状流', forceSplitAnn);
+        const errors = [mainRes.error, annRes.error].filter(Boolean);
+        if (errors.length > 0) return { errors };
+        const allComponents = mainRes.components.concat(annRes.components);
+        const componentResults = allComponents.map(comp => {
+          const { candidates, excluded } = matchMfcs(comp.flowMin, comp.flowMax, comp.gas, pressKPa, portsNeeded);
+          let partition = null;
+          const hasStrictFullMatch = candidates.some(c => !c.isFallback);
+          let finalCandidates = candidates;
+          if (!hasStrictFullMatch && comp.flowMax > comp.flowMin + 1e-6) {
+            const part = buildRangePartition(comp.gas, comp.flowMin, comp.flowMax, pressKPa, portsNeeded);
+            if (part && part.segments.length > 1) {
+              partition = part; // 2区間以上に分けて初めて意味のある提案になる
+              // 分割案を使う場合、単一の応急候補は競合判定の対象から外す(このラインでは使わないため)
+              finalCandidates = candidates.filter(c => !c.isFallback);
+            }
+          }
+          return { comp, candidates: finalCandidates, excluded, partition };
+        });
+        const partitionUsedBy = reservePartitionDevices(componentResults, pressKPa, portsNeeded);
+        const usedBy = resolveComponentAssignments(componentResults, partitionUsedBy);
+        fillUnassignedWithFallback(componentResults, usedBy);
+        const labels = allComponents.map(c => c.label);
+        return { errors: [], allComponents, componentResults, usedBy, labels };
+      }
+
+      let forceSplitMain, forceSplitAnn; // undefined = 自動判定(needsSplit)に従う
+      let result = buildBurnerResult(forceSplitMain, forceSplitAnn);
+      if (result.errors.length > 0) { showToast(result.errors[0]); return; }
+
+      // 未分岐のまま失敗している(候補なし、または他ラインとの競合で割当不可)ラインについて、
+      // 分岐すれば解決するかを確認し、解決する場合は分岐に切り替えて再計算する
+      ['main', 'ann'].forEach(p => {
+        const role = SPLIT_ROLE[p];
+        const idx = result.componentResults.findIndex(cr => cr.comp.stream === p && cr.comp.role === role && !cr.comp.branch);
+        if (idx === -1) return;
+        const cr = result.componentResults[idx];
+        const failed = !cr.partition && (cr.candidates.length === 0 || !cr.assigned);
+        if (failed && wouldSplitHelp(cr.comp.gas, cr.comp.flowMin, cr.comp.flowMax, portsNeeded)) {
+          if (p === 'main') forceSplitMain = true; else forceSplitAnn = true;
+        }
+      });
+
+      if (forceSplitMain || forceSplitAnn) {
+        result = buildBurnerResult(forceSplitMain, forceSplitAnn);
+        if (result.errors.length > 0) { showToast(result.errors[0]); return; }
+      }
+
+      // 分岐した2系統のうち、片方でも(応急候補を含めて)割り当てられるMFCが無い場合は、
+      // 2台同時使用という前提自体が成立しないため、分岐をやめて単一MFC(1台)での対応に戻す
+      ['main', 'ann'].forEach(p => {
+        const role = SPLIT_ROLE[p];
+        const branches = result.componentResults.filter(cr => cr.comp.stream === p && cr.comp.role === role && cr.comp.branch);
+        if (branches.length === 0) return;
+        const anyUnassigned = branches.some(cr => !cr.assigned);
+        if (anyUnassigned) {
+          if (p === 'main') forceSplitMain = false; else forceSplitAnn = false;
+        }
+      });
+
+      if (forceSplitMain === false || forceSplitAnn === false) {
+        result = buildBurnerResult(forceSplitMain, forceSplitAnn);
+        if (result.errors.length > 0) { showToast(result.errors[0]); return; }
+      }
+
+      const { allComponents, componentResults, usedBy, labels } = result;
+
+      // 分岐(主流酸化剤/環状流燃料など)は同じbaseLabelを持つので、1セクションにまとめる
+      const groups = [];
+      const groupIndexByKey = new Map();
+      componentResults.forEach((cr, idx) => {
+        if (cr.comp.branch) {
+          const gKey = cr.comp.baseLabel;
+          if (!groupIndexByKey.has(gKey)) {
+            groupIndexByKey.set(gKey, groups.length);
+            groups.push({ baseLabel: cr.comp.baseLabel, items: [] });
+          }
+          groups[groupIndexByKey.get(gKey)].items.push({ cr, idx });
+        } else {
+          groups.push({ baseLabel: cr.comp.baseLabel, items: [{ cr, idx }] });
+        }
+      });
+
+      let html = '';
+      groups.forEach(g => {
+        const totalMin = g.items.reduce((s, it) => s + it.cr.comp.flowMin, 0);
+        const totalMax = g.items.reduce((s, it) => s + it.cr.comp.flowMax, 0);
+        const isSplitLine = g.items.some(it => it.cr.comp.isSplitRole);
+        const singleItemAssigned = g.items.length === 1 && g.items[0].cr.assigned;
+        const singleIsFallback = singleItemAssigned && g.items[0].cr.assigned.isFallback;
+        const autoNote = g.items.length > 1
+          ? '<span class="count-pill" style="margin-left:8px;">自動判定: 分岐あり(単一MFCでは対応不可)</span>'
+          : (isSplitLine
+              ? (singleIsFallback
+                  ? '<span class="count-pill" style="margin-left:8px;">自動判定: 分岐なし(2台同時使用が成立しないため単一機で対応)</span>'
+                  : '<span class="count-pill" style="margin-left:8px;">自動判定: 分岐なし(単一MFCで対応可能)</span>')
+              : '');
+
+        html += '<div class="component-section">'
+          + '<div class="component-head"><div class="c-title">' + escapeHtml(g.baseLabel) + autoNote + '</div>'
+          + '<div class="c-flow">必要流量(合計) &asymp; ' + fmtFlowRangeLmin(totalMin, totalMax) + '</div></div>';
+
+        if (g.items.length > 1) {
+          // 分岐あり: 2つの推奨MFCを枠として並べて表示(緑のカードが2枠並ぶイメージ)
+          html += '<div class="split-pair">';
+          g.items.forEach((item, i) => {
+            const { cr } = item;
+            html += '<div><div class="split-slot-label">系統 ' + (i+1) + ' <span class="mono">(&asymp; ' + fmtFlowRangeLmin(cr.comp.flowMin, cr.comp.flowMax) + ')</span></div>';
+            if (cr.partition) {
+              html += '<div class="empty-state" style="background:var(--accent-soft); color:var(--ink);">単一のMFCでは範囲全体をカバーできません。下の「候補一覧・対象外MFCを見る」に範囲分割の推奨があります。</div>';
+            } else if (!cr.assigned) {
+              if (cr.candidates.length === 0) {
+                html += '<div class="empty-state">この範囲をカバーできるMFCが見つかりませんでした。</div>';
+              } else {
+                html += cr.candidates.map(c => candidateCardHtml(c, { cls: 'reserved', tagCls: 'reserved', tagText: '他ラインに割当済み(' + escapeHtml(labels[usedBy[c.m.id]]) + ')' })).join('')
+                  + '<div class="helptext">この範囲をカバーできる他のMFCが登録されていないため、この系統には割り当てられる機器がありません。台数を増やすか、範囲を見直してください。</div>';
+              }
+            } else if (cr.assigned.isFallback) {
+              html += candidateCardHtml(cr.assigned, { cls: 'caution', tagCls: 'caution', tagText: '応急的候補(要確認)' });
+            } else {
+              html += candidateCardHtml(cr.assigned, cr.assigned.lowAccuracy
+                ? { cls: 'caution', tagCls: 'caution', tagText: '要注意(低レンジ)' }
+                : { cls: 'best', tagCls: 'best', tagText: '推奨' });
+            }
+            html += '</div>';
+          });
+          html += '</div>';
+
+          // 候補一覧・対象外の詳細は折りたたみでまとめて表示
+          html += '<details class="excluded-block" style="margin-top:6px;"><summary>各系統の候補一覧・対象外MFCを見る</summary>';
+          g.items.forEach((item, i) => {
+            html += '<div style="margin-top:12px;"><div class="split-slot-label">系統 ' + (i+1) + '</div>'
+              + buildComponentResultHtml(item.cr, usedBy, item.idx, labels)
+              + '</div>';
+          });
+          html += '</details>';
+        } else {
+          const item = g.items[0];
+          html += buildComponentResultHtml(item.cr, usedBy, item.idx, labels);
+        }
+        html += '</div>';
+      });
+      body.innerHTML = html;
+    }
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.getElementById('runBtn').addEventListener('click', runSelection);
+
+  loadData();
+})();
+</script>
+</body>
+</html>
