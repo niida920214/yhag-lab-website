@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #F4F6F7;
@@ -64,7 +65,7 @@
   }
   .mono { font-family: "IBM Plex Mono", "SF Mono", monospace; }
 
-  .shell { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+  .shell { max-width: 1320px; margin: 0 auto; padding: 20px 16px 80px; }
 
   header.top {
     display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
@@ -72,9 +73,35 @@
   }
   header.top h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
   header.top .sub { font-size: 12.5px; color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; }
+  @media (max-width: 460px) {
+    header.top .sub { display: none; }
+    header.top h1 { font-size: 17px; }
+  }
 
-  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+  .mainnav {
+    display: flex; gap: 6px; margin-bottom: 20px; padding: 4px;
+    background: var(--panel-2); border-radius: var(--radius); border: 1px solid var(--line);
+  }
+  .mainnav-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 12px; border: none; border-radius: var(--radius); background: transparent;
+    color: var(--ink-soft); font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+    white-space: nowrap;
+  }
+  .mainnav-btn.active { background: var(--panel); color: var(--accent-ink); box-shadow: var(--shadow); }
+  .mainnav-btn:hover:not(.active) { color: var(--ink); }
+  .mainnav-badge {
+    display: inline-block; min-width: 18px; padding: 1px 5px; border-radius: 999px;
+    background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; font-family: "IBM Plex Mono", monospace;
+  }
+  @media (max-width: 480px) {
+    .mainnav-btn { font-size: 12px; padding: 10px 6px; }
+  }
+
+  .view-panel { display: none; }
+  .view-panel.active { display: block; }
+
+  .grid { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
 
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
   .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
@@ -84,13 +111,26 @@
 
   .count-pill { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-faint); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
 
-  table.mfc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.mfc-table th { text-align: left; font-weight: 600; color: var(--ink-soft); font-size: 11.5px; padding: 6px 8px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-  table.mfc-table td { padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  table.mfc-table tr:last-child td { border-bottom: none; }
-  table.mfc-table .num { font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
-  table.mfc-table .name { font-weight: 600; }
-  table.mfc-table .note { color: var(--ink-faint); font-size: 12px; }
+  .mfc-card {
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px;
+    background: var(--panel);
+  }
+  .mfc-card:last-child { margin-bottom: 0; }
+  .mfc-card-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  .mfc-card-head .name { font-weight: 700; font-size: 14px; }
+  .mfc-card-head .note { color: var(--ink-faint); font-size: 12px; margin-top: 2px; }
+  .mfc-gas-lines { display: flex; flex-direction: column; gap: 6px; }
+  .mfc-gas-line {
+    display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+    font-size: 12.5px; padding: 4px 0;
+  }
+  .mfc-gas-line .mono { white-space: nowrap; }
+  .mfc-gas-line .note { color: var(--ink-faint); }
+  .name { font-weight: 600; }
+  .note { color: var(--ink-faint); font-size: 12px; }
 
   .row-actions { display: flex; gap: 6px; white-space: nowrap; }
   .icon-btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-soft); border-radius: var(--radius); padding: 3px 8px; font-size: 12px; cursor: pointer; }
@@ -103,6 +143,9 @@
   label.field .lab { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 5px; }
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 420px) {
+    .field-row, .field-row3 { grid-template-columns: 1fr; }
+  }
 
   .gas-card {
     border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; background: var(--panel-2);
@@ -117,16 +160,28 @@
   .gas-card-grid.press-row { grid-template-columns: 1fr 1fr 1fr; }
   .gas-card .g-field { display: flex; flex-direction: column; }
   .gas-card .g-field .lab { font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; }
-  @media (max-width: 520px) {
-    .gas-card-grid { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 600px) {
+    .gas-card-grid, .gas-card-grid.press-row { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 430px) {
+    .gas-card-grid, .gas-card-grid.press-row { grid-template-columns: 1fr; }
   }
 
-  input[type=text], input[type=number], select {
+  input[type=text], input[type=number], input[type=date], select {
     width: 100%; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: var(--radius);
     background: var(--panel); color: var(--ink); font-size: 13.5px; font-family: inherit;
   }
   input.mono, select.mono { font-family: "IBM Plex Mono", monospace; }
   input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+  @media (max-width: 600px) {
+    /* iOSでの入力欄タップ時の自動ズームを防ぐため16px以上を確保 */
+    input[type=text], input[type=number], input[type=date], select {
+      font-size: 16px; padding: 10px 10px;
+    }
+    .btn { padding: 10px 14px; font-size: 14px; }
+    body { font-size: 15px; }
+  }
 
   .btn {
     display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius);
@@ -146,16 +201,19 @@
   .divider { height: 1px; background: var(--line); margin: 16px 0; }
 
   /* タブ */
-  .tabbar { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+  .tabbar { display: flex; gap: 18px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
   .tab-btn {
-    padding: 9px 4px; margin-bottom: -1px; border: none; background: transparent; cursor: pointer;
+    padding: 9px 2px; margin-bottom: -1px; border: none; background: transparent; cursor: pointer;
     font-size: 13px; font-weight: 600; color: var(--ink-faint); border-bottom: 2px solid transparent;
-    font-family: inherit;
+    font-family: inherit; white-space: nowrap;
   }
-  .tab-btn + .tab-btn { margin-left: 14px; }
   .tab-btn.active { color: var(--accent-ink); border-bottom-color: var(--accent); }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
+
+  @media (max-width: 400px) {
+    .tab-btn { font-size: 12px; }
+  }
 
   /* バーナー形状 */
   .geo-readout {
@@ -165,6 +223,12 @@
   .geo-readout .g-lab { color: var(--ink-faint); }
   .geo-readout .g-val { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
 
+  .stream-pair {
+    display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start;
+  }
+  @media (min-width: 1180px) {
+    .stream-pair { grid-template-columns: 1fr 1fr; }
+  }
   fieldset.stream-block {
     border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-top: 14px;
   }
@@ -187,6 +251,9 @@
   .result-tag.reserved { background: var(--panel-2); color: var(--ink-faint); border: 1px solid var(--line); }
 
   .result-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; font-size: 12.5px; }
+  @media (max-width: 480px) {
+    .result-meta { grid-template-columns: 1fr 1fr; }
+  }
   .result-meta .m-lab { color: var(--ink-faint); font-size: 11px; }
   .result-meta .m-val { font-family: "IBM Plex Mono", monospace; font-weight: 600; }
 
@@ -228,11 +295,11 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  dialog#mfcDialog {
+  dialog#mfcDialog, dialog#confirmDialog {
     border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0; width: min(520px, 92vw);
     background: var(--panel); color: var(--ink); box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   }
-  dialog#mfcDialog::backdrop { background: rgba(20,24,26,0.45); }
+  dialog#mfcDialog::backdrop, dialog#confirmDialog::backdrop { background: rgba(20,24,26,0.45); }
   .dialog-head { padding: 14px 18px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 15px; }
   .dialog-body { padding: 16px 18px; max-height: 70vh; overflow-y: auto; }
   .dialog-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
@@ -247,40 +314,27 @@
     <div class="sub">FLOW &middot; GAS &middot; PRESSURE &middot; PORTS</div>
   </header>
 
-  <div class="grid">
-    <!-- 左: 登録済みMFC一覧 -->
-    <section class="panel" id="inventoryPanel">
-      <div class="panel-head">
-        <h2>登録済みMFC</h2>
-        <span class="count-pill" id="mfcCount">0台</span>
-      </div>
-      <div class="panel-body">
-        <div id="tableWrap"></div>
-      </div>
-      <div class="panel-foot" style="justify-content:space-between;">
-        <div style="display:flex; gap:8px;">
-          <button class="btn small" id="exportBtn" type="button">書き出し(JSON)</button>
-          <button class="btn small" id="importBtn" type="button">読み込み(JSON)</button>
-          <input type="file" id="importFile" accept="application/json" style="display:none;">
-        </div>
-        <button class="btn primary" id="addMfcBtn" type="button">+ MFCを登録</button>
-      </div>
-    </section>
+  <nav class="mainnav" id="mainNav">
+    <button class="mainnav-btn active" data-view="select" type="button">選定条件</button>
+    <button class="mainnav-btn" data-view="result" type="button">選定結果</button>
+    <button class="mainnav-btn" data-view="inventory" type="button">MFC管理<span class="mainnav-badge" id="invNavBadge"></span></button>
+  </nav>
 
-    <!-- 右: 選定パネル -->
-    <section class="panel" id="selectPanel">
+  <div class="grid">
+    <!-- 選定パネル -->
+    <section class="panel view-panel active" id="selectPanel" data-view="select">
       <div class="panel-head">
         <h2>選定条件を入力</h2>
       </div>
       <div class="panel-body">
 
         <div class="tabbar">
-          <button class="tab-btn active" data-tab="manual" type="button">流量で指定</button>
-          <button class="tab-btn" data-tab="burner" type="button">流速(DNBバーナー)で指定</button>
+          <button class="tab-btn" data-tab="manual" type="button">流量で指定</button>
+          <button class="tab-btn active" data-tab="burner" type="button">流速(DNBバーナー)で指定</button>
         </div>
 
         <!-- タブ1: 流量で直接指定 -->
-        <div class="tab-panel active" id="tab-manual">
+        <div class="tab-panel" id="tab-manual">
           <div class="field-row">
             <label class="field">
               <span class="lab">目標流量</span>
@@ -303,36 +357,38 @@
         </div>
 
         <!-- タブ2: DNBバーナー流速から算出 -->
-        <div class="tab-panel" id="tab-burner">
+        <div class="tab-panel active" id="tab-burner">
           <div class="subgroup" style="border-top:none; margin-top:0;">
             <div class="lab" style="font-weight:700; margin-bottom:6px;">バーナー形状(Coaxial Dual Nozzle Burner)</div>
             <div class="field-row3">
               <label class="field">
                 <span class="lab">主流ノズル内径</span>
-                <input type="number" id="dMain" class="mono" step="any" placeholder="例: 10">
+                <input type="number" id="dMain" class="mono" step="any" value="10" placeholder="例: 10">
               </label>
               <label class="field">
                 <span class="lab">環状ノズル内径</span>
-                <input type="number" id="dAnnIn" class="mono" step="any" placeholder="例: 14">
+                <input type="number" id="dAnnIn" class="mono" step="any" value="10" placeholder="例: 14">
               </label>
               <label class="field">
                 <span class="lab">環状ノズル外径</span>
-                <input type="number" id="dAnnOut" class="mono" step="any" placeholder="例: 20">
+                <input type="number" id="dAnnOut" class="mono" step="any" value="17" placeholder="例: 20">
               </label>
             </div>
             <div class="helptext">単位はすべて mm。環状ノズルは「内径」(主流管の外壁側)と「外径」で環の断面積を計算します。</div>
             <div class="geo-readout" id="geoReadout"></div>
           </div>
 
-          <fieldset class="stream-block">
-            <legend>主流(円管バーナー)</legend>
-            <div id="streamCfg-main"></div>
-          </fieldset>
+          <div class="stream-pair">
+            <fieldset class="stream-block">
+              <legend>主流(円管バーナー)</legend>
+              <div id="streamCfg-main"></div>
+            </fieldset>
 
-          <fieldset class="stream-block">
-            <legend>環状流(環状バーナー)</legend>
-            <div id="streamCfg-ann"></div>
-          </fieldset>
+            <fieldset class="stream-block">
+              <legend>環状流(環状バーナー)</legend>
+              <div id="streamCfg-ann"></div>
+            </fieldset>
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -358,17 +414,41 @@
           <div class="helptext">ガス系統1本あたりに必要な本数(通常1)。全ガス系統・全流路に共通の値として使用します。</div>
         </label>
 
-        <button class="btn primary block" id="runBtn" type="button">適合するMFCを探す</button>
+        <div class="field-row" style="gap:8px;">
+          <button class="btn ghost" id="resetSelectionBtn" type="button" style="flex:0 0 auto;">条件をリセット</button>
+          <button class="btn primary block" id="runBtn" type="button">適合するMFCを探す</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 結果 -->
+    <section class="panel view-panel" id="resultPanel" data-view="result">
+      <div class="panel-head"><h2>選定結果</h2></div>
+      <div class="panel-body" id="resultBody"></div>
+    </section>
+
+    <!-- 登録済みMFC一覧 -->
+    <section class="panel view-panel" id="inventoryPanel" data-view="inventory">
+      <div class="panel-head">
+        <h2>登録済みMFC</h2>
+        <span class="count-pill" id="mfcCount">0台</span>
+      </div>
+      <div class="panel-body">
+        <div id="tableWrap"></div>
+      </div>
+      <div class="panel-foot" style="justify-content:space-between; flex-wrap:wrap; row-gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn small" id="exportBtn" type="button">書き出し(JSON)</button>
+          <button class="btn small" id="importBtn" type="button">読み込み(JSON)</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none;">
+          <button class="btn small" id="excelImportBtn" type="button">Excelから読み込む</button>
+          <input type="file" id="excelImportFile" accept=".xlsx,.xls" style="display:none;">
+          <button class="btn small" id="resetInventoryBtn" type="button" style="color:var(--bad); border-color:var(--bad);">全削除</button>
+        </div>
+        <button class="btn primary" id="addMfcBtn" type="button">+ MFCを登録</button>
       </div>
     </section>
   </div>
-
-  <!-- 結果 -->
-  <section class="panel" id="resultPanel" style="margin-top:20px; display:none;">
-    <div class="panel-head"><h2>選定結果</h2></div>
-    <div class="panel-body" id="resultBody"></div>
-  </section>
-</div>
 
 <dialog id="mfcDialog">
   <div class="dialog-head" id="dialogTitle">MFCを登録</div>
@@ -400,6 +480,17 @@
   </div>
 </dialog>
 
+<dialog id="confirmDialog" style="max-width:420px;">
+  <div class="dialog-head" id="confirmTitle">確認</div>
+  <div class="dialog-body">
+    <div id="confirmMessage" style="white-space:pre-wrap; font-size:13.5px; line-height:1.7;"></div>
+  </div>
+  <div class="dialog-foot">
+    <button class="btn ghost" id="confirmCancelBtn" type="button">キャンセル</button>
+    <button class="btn primary" id="confirmOkBtn" type="button">OK</button>
+  </div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -422,6 +513,38 @@
   function uid(){ return 'm' + Math.random().toString(36).slice(2, 10); }
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // window.confirm()はArtifactのサンドボックス内では動作しない場合があるため、
+  // 独自のdialog要素を使った確認モーダルを用意する。
+  function showConfirm(message, opts){
+    opts = opts || {};
+    return new Promise((resolve) => {
+      const dialog = document.getElementById('confirmDialog');
+      document.getElementById('confirmTitle').textContent = opts.title || '確認';
+      document.getElementById('confirmMessage').textContent = message;
+      const okBtn = document.getElementById('confirmOkBtn');
+      const cancelBtn = document.getElementById('confirmCancelBtn');
+      okBtn.textContent = opts.okText || 'OK';
+      cancelBtn.textContent = opts.cancelText || 'キャンセル';
+      okBtn.style.background = opts.danger ? 'var(--bad)' : '';
+      okBtn.style.borderColor = opts.danger ? 'var(--bad)' : '';
+
+      function cleanup(result){
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        dialog.removeEventListener('cancel', onCancel);
+        dialog.close();
+        resolve(result);
+      }
+      function onOk(){ cleanup(true); }
+      function onCancel(){ cleanup(false); }
+
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      dialog.addEventListener('cancel', onCancel); // Escキー等
+      dialog.showModal();
+    });
   }
 
   /* ---------- 燃料データベース(化学量論計算用) ---------- */
@@ -821,6 +944,24 @@
   }
 ];
 
+  /* ---------- メインナビゲーション(選定条件/選定結果/MFC管理) ---------- */
+  function switchView(view){
+    document.querySelectorAll('.view-panel').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === view);
+    });
+    document.querySelectorAll('.mainnav-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+    });
+    window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+  }
+  document.querySelectorAll('.mainnav-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.getAttribute('data-view')));
+  });
+  function updateInvNavBadge(){
+    const badge = document.getElementById('invNavBadge');
+    badge.textContent = mfcs.length;
+  }
+
   function loadData(){
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -846,31 +987,34 @@
   function renderTable(){
     const wrap = document.getElementById('tableWrap');
     document.getElementById('mfcCount').textContent = mfcs.length + '台';
+    updateInvNavBadge();
     if (mfcs.length === 0) {
       wrap.innerHTML = '<div class="empty-state">まだMFCが登録されていません。<br>「MFCを登録」から保有機器を追加してください。</div>';
       return;
     }
-    let html = '<table class="mfc-table"><thead><tr>' +
-      '<th>名称</th><th>ガス別レンジ・2次圧・検定日</th><th>本数</th><th></th>' +
-      '</tr></thead><tbody>';
+    let html = '';
     mfcs.forEach(m => {
       const gasLines = m.gasConfigs.map(g =>
-        '<div><span class="mono">'+escapeHtml(g.gas)+'</span>: '+g.min+'&ndash;'+g.max+' '+g.unit+
-        ' / 2次圧 '+g.pPress+' '+g.pUnit+
-        ' / 傾き '+g.slope+' 切片 '+g.intercept+
-        ' <span class="note">('+(g.calDate ? '検定: '+escapeHtml(g.calDate) : '検定日未登録')+')</span></div>'
+        '<div class="mfc-gas-line">'
+        + '<span class="mono" style="font-weight:700;">'+escapeHtml(g.gas)+'</span>'
+        + '<span class="mono">'+g.min+'&ndash;'+g.max+' '+g.unit+'</span>'
+        + '<span class="mono">2次圧 '+g.pPress+' '+g.pUnit+'</span>'
+        + '<span class="mono">傾き '+g.slope+' / 切片 '+g.intercept+'</span>'
+        + '<span class="note">'+(g.calDate ? '検定: '+escapeHtml(g.calDate) : '検定日未登録')+'</span>'
+        + '</div>'
       ).join('');
-      html += '<tr>' +
-        '<td><div class="name">'+escapeHtml(m.name)+'</div>'+(m.note ? '<div class="note">'+escapeHtml(m.note)+'</div>' : '')+'</td>' +
-        '<td class="num">'+gasLines+'</td>' +
-        '<td class="num">'+m.ports+'</td>' +
-        '<td><div class="row-actions">' +
-          '<button class="icon-btn" data-edit="'+m.id+'" type="button">編集</button>' +
-          '<button class="icon-btn danger" data-del="'+m.id+'" type="button">削除</button>' +
-        '</div></td>' +
-      '</tr>';
+      html += '<div class="mfc-card">'
+        + '<div class="mfc-card-head">'
+        +   '<div><div class="name">'+escapeHtml(m.name)+'</div>'+(m.note ? '<div class="note">'+escapeHtml(m.note)+'</div>' : '')+'</div>'
+        +   '<div class="row-actions">'
+        +     '<button class="icon-btn" data-edit="'+m.id+'" type="button">編集</button>'
+        +     '<button class="icon-btn danger" data-del="'+m.id+'" type="button">削除</button>'
+        +   '</div>'
+        + '</div>'
+        + '<div class="mfc-gas-lines">' + gasLines + '</div>'
+        + '<div class="helptext" style="margin-top:8px; margin-bottom:0;">接続本数: <span class="mono">'+m.ports+'</span></div>'
+        + '</div>';
     });
-    html += '</tbody></table>';
     wrap.innerHTML = html;
     wrap.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openDialog(b.getAttribute('data-edit'))));
     wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteMfc(b.getAttribute('data-del'))));
@@ -955,15 +1099,32 @@
     dialog.showModal();
   }
 
-  function deleteMfc(id){
+  async function deleteMfc(id){
     const m = mfcs.find(x => x.id === id);
     if (!m) return;
-    if (!confirm(m.name + ' を削除しますか?')) return;
+    const ok = await showConfirm(m.name + ' を削除しますか?', { danger: true, okText: '削除' });
+    if (!ok) return;
     mfcs = mfcs.filter(x => x.id !== id);
     saveData(); renderTable();
   }
 
   document.getElementById('addMfcBtn').addEventListener('click', () => openDialog(null));
+
+  document.getElementById('resetInventoryBtn').addEventListener('click', async () => {
+    if (mfcs.length === 0) { showToast('登録されているMFCはありません'); return; }
+    const ok = await showConfirm(
+      '登録されている' + mfcs.length + '台のMFCをすべて削除します。この操作は元に戻せません。\n先に「書き出し(JSON)」でバックアップを取ることをおすすめします。\n\n本当に削除しますか?',
+      { title: '全削除の確認', danger: true, okText: '削除する' }
+    );
+    if (!ok) return;
+    const ok2 = await showConfirm('最終確認: 本当にすべて削除してよいですか?', { title: '最終確認', danger: true, okText: '完全に削除' });
+    if (!ok2) return;
+    mfcs = [];
+    saveData(); renderTable();
+    document.getElementById('resultBody').innerHTML = '';
+    document.getElementById('resultPanel').classList.remove('active');
+    showToast('MFC一覧をすべて削除しました');
+  });
 
   document.getElementById('exportBtn').addEventListener('click', async () => {
     if (mfcs.length === 0) { showToast('登録されているMFCがありません'); return; }
@@ -999,6 +1160,128 @@
     showToast('書き出しました');
   });
 
+  /* ---------- Excel(印刷用シート)からの直接読み込み ---------- */
+  const EXCEL_ROW_LABELS = {
+    '検定日': 'calDate',
+    'レギュレータ二次圧[Mpa]': 'pPress',
+    '傾き': 'slope',
+    '切片': 'intercept',
+    '最大誤差 [%]': 'maxError',
+    '制御範囲 [V]': 'voltageRange',
+    '制御範囲 [L/min]': 'rangeLmin'
+  };
+  function excelDateToStr(d){
+    if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+    const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
+    return y + '-' + m + '-' + day;
+  }
+  function excelParseRange(raw){
+    if (raw === null || raw === undefined || raw === '') return null;
+    const s = String(raw).trim();
+    const parts = s.split(/[~～]/).map(x => parseFloat(x));
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+    return { min: parts[0], max: parts[1] };
+  }
+  function excelNum(raw, fallback){
+    if (typeof raw === 'number') return raw;
+    const v = parseFloat(raw);
+    return isNaN(v) ? fallback : v;
+  }
+  // 「印刷用」シートを、ガスごとのブロック(見出し行+検定日/2次圧/傾き/切片/制御範囲[L/min]の行)として解析する
+  function excelRowsToParsedList(rows){
+    const blocks = [];
+    let current = null;
+    rows.forEach(row => {
+      const a = (row && row[0] !== undefined && row[0] !== null) ? String(row[0]).trim() : '';
+      if (!a) return;
+      if (EXCEL_ROW_LABELS[a]) {
+        if (current) current.rows[EXCEL_ROW_LABELS[a]] = row;
+      } else {
+        current = { gas: a, header: row, rows: {} };
+        blocks.push(current);
+      }
+    });
+
+    const byName = {};
+    blocks.forEach(block => {
+      const header = block.header;
+      for (let j = 1; j < header.length; j++) {
+        const mfcName = (header[j] !== null && header[j] !== undefined) ? String(header[j]).trim() : '';
+        if (!mfcName) continue;
+        const rangeRaw = block.rows.rangeLmin ? block.rows.rangeLmin[j] : null;
+        const range = excelParseRange(rangeRaw);
+        if (!range) continue; // レンジが読めない組み合わせはスキップ
+        const gasConfig = {
+          gas: block.gas,
+          min: range.min, max: range.max, unit: 'L/min',
+          pPress: excelNum(block.rows.pPress ? block.rows.pPress[j] : null, 0),
+          pUnit: 'MPa',
+          calDate: excelDateToStr(block.rows.calDate ? block.rows.calDate[j] : null),
+          slope: excelNum(block.rows.slope ? block.rows.slope[j] : null, 1),
+          intercept: excelNum(block.rows.intercept ? block.rows.intercept[j] : null, 0)
+        };
+        if (!byName[mfcName]) byName[mfcName] = [];
+        byName[mfcName].push(gasConfig);
+      }
+    });
+    return Object.keys(byName).map(name => ({ name, gasConfigs: byName[name] }));
+  }
+  function mergeExcelIntoInventory(parsedList){
+    let addedMfc = 0, addedGas = 0, updatedGas = 0;
+    parsedList.forEach(parsed => {
+      let existing = mfcs.find(m => m.name.trim() === parsed.name.trim());
+      if (!existing) {
+        existing = { id: uid(), name: parsed.name, gasConfigs: [], ports: 1, note: '' };
+        mfcs.push(existing);
+        addedMfc++;
+      }
+      parsed.gasConfigs.forEach(gc => {
+        const idx = existing.gasConfigs.findIndex(g => g.gas.toLowerCase() === gc.gas.toLowerCase());
+        if (idx >= 0) { existing.gasConfigs[idx] = gc; updatedGas++; }
+        else { existing.gasConfigs.push(gc); addedGas++; }
+      });
+    });
+    return { addedMfc, addedGas, updatedGas };
+  }
+
+  document.getElementById('excelImportBtn').addEventListener('click', () => {
+    if (typeof XLSX === 'undefined') { showToast('Excel読み込み機能を初期化できませんでした(通信環境を確認してください)'); return; }
+    document.getElementById('excelImportFile').click();
+  });
+  document.getElementById('excelImportFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const data = new Uint8Array(reader.result);
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        const sheetName = wb.SheetNames.includes('印刷用') ? '印刷用' : wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+        const parsedList = excelRowsToParsedList(rows);
+        const totalGasEntries = parsedList.reduce((s, p) => s + p.gasConfigs.length, 0);
+        if (parsedList.length === 0 || totalGasEntries === 0) {
+          showToast('シート「' + sheetName + '」から読み取れるデータが見つかりませんでした');
+          return;
+        }
+        const ok = await showConfirm(
+          'シート「' + sheetName + '」から ' + parsedList.length + '台のMFC・' + totalGasEntries + '件のガス設定を読み取りました。\n' +
+          '既存の同名MFCはガス設定を上書きし、新しいMFCは追加します(接続本数・備考は変更しません)。\n適用しますか?',
+          { title: 'Excelの読み込み', okText: '適用する' }
+        );
+        if (!ok) return;
+        const { addedMfc, addedGas, updatedGas } = mergeExcelIntoInventory(parsedList);
+        saveData(); renderTable();
+        showToast('Excelから反映しました(新規MFC ' + addedMfc + '台 / 新規ガス設定 ' + addedGas + '件 / 更新 ' + updatedGas + '件)');
+      } catch (err) {
+        showToast('Excelの読み込みに失敗しました: ' + (err && err.message ? err.message : ''));
+      }
+      document.getElementById('excelImportFile').value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
   document.getElementById('importBtn').addEventListener('click', () => {
     document.getElementById('importFile').click();
   });
@@ -1006,13 +1289,16 @@
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result);
         if (!Array.isArray(data)) throw new Error('invalid format');
         const incoming = data.map(migrateRecord);
         const merge = mfcs.length > 0
-          ? confirm('既に' + mfcs.length + '台登録されています。読み込んだ' + incoming.length + '台を追加しますか?\n(キャンセルすると、既存のデータを置き換えます)')
+          ? await showConfirm(
+              '既に' + mfcs.length + '台登録されています。読み込んだ' + incoming.length + '台をどう反映しますか?',
+              { title: 'JSONの読み込み', okText: '追加する', cancelText: '既存を置き換える' }
+            )
           : true;
         if (merge) {
           incoming.forEach(m => { m.id = uid(); }); // 追加時はID重複を避ける
@@ -1122,21 +1408,28 @@
       + '</div>';
   }
 
-  ['main','ann'].forEach(p => {
-    document.getElementById('streamCfg-' + p).innerHTML = streamConfigHtml(p);
+  function initStreamConfigs(){
+    ['main','ann'].forEach(p => {
+      document.getElementById('streamCfg-' + p).innerHTML = streamConfigHtml(p);
 
-    document.getElementById(p+'FlameType').addEventListener('change', (e) => {
-      const isPremix = e.target.value === 'premixed';
-      document.getElementById(p+'PremixGroup').style.display = isPremix ? '' : 'none';
-      document.getElementById(p+'DiffGroup').style.display = isPremix ? 'none' : '';
+      document.getElementById(p+'FlameType').addEventListener('change', (e) => {
+        const isPremix = e.target.value === 'premixed';
+        document.getElementById(p+'PremixGroup').style.display = isPremix ? '' : 'none';
+        document.getElementById(p+'DiffGroup').style.display = isPremix ? 'none' : '';
+      });
+      document.getElementById(p+'Fuel').addEventListener('change', (e) => {
+        document.getElementById(p+'FuelCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
+      });
+      document.getElementById(p+'MainGas').addEventListener('change', (e) => {
+        document.getElementById(p+'MainCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
+      });
     });
-    document.getElementById(p+'Fuel').addEventListener('change', (e) => {
-      document.getElementById(p+'FuelCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
-    });
-    document.getElementById(p+'MainGas').addEventListener('change', (e) => {
-      document.getElementById(p+'MainCustomGroup').style.display = e.target.value === 'custom' ? '' : 'none';
-    });
-  });
+    updateGeoReadoutSafe();
+  }
+  function updateGeoReadoutSafe(){
+    if (typeof updateGeoReadout === 'function') updateGeoReadout();
+  }
+  initStreamConfigs();
 
   /* ---------- バーナー形状: 断面積の読み出し表示 ---------- */
   function mm2ToM2(mm2){ return mm2 * 1e-6; }
@@ -1644,9 +1937,7 @@
     const portsNeeded = parseInt(document.getElementById('qPorts').value, 10) || 1;
 
     const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
-    const panel = document.getElementById('resultPanel');
     const body = document.getElementById('resultBody');
-    panel.style.display = 'block';
 
     if (activeTab === 'manual') {
       const flowVal = parseFloat(document.getElementById('qFlow').value);
@@ -1655,6 +1946,7 @@
       if (isNaN(flowVal)) { showToast('目標流量を入力してください'); return; }
       const flowSccm = toSccm(flowVal, flowUnit);
       const { candidates, excluded } = matchMfcs(flowSccm, flowSccm, gasQuery, pressKPa, portsNeeded);
+      switchView('result');
       body.innerHTML = buildResultHtml(candidates, excluded);
     } else {
       function buildBurnerResult(forceSplitMain, forceSplitAnn){
@@ -1801,12 +2093,35 @@
         }
         html += '</div>';
       });
+      switchView('result');
       body.innerHTML = html;
     }
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   document.getElementById('runBtn').addEventListener('click', runSelection);
+
+  document.getElementById('resetSelectionBtn').addEventListener('click', () => {
+    // 手動タブ
+    document.getElementById('qFlow').value = '';
+    document.getElementById('qUnit').value = 'L/min';
+    document.getElementById('qGas').value = '';
+    // 共通(2次圧・接続本数)
+    document.getElementById('qPress').value = '';
+    document.getElementById('qPressUnit').value = 'MPa';
+    document.getElementById('qPorts').value = 1;
+    // DNBバーナー形状
+    document.getElementById('dMain').value = 10;
+    document.getElementById('dAnnIn').value = 10;
+    document.getElementById('dAnnOut').value = 17;
+    updateGeoReadout();
+    // 主流・環状流の設定を初期状態に再生成
+    initStreamConfigs();
+    // 結果表示をクリアし、選定条件ビューへ戻す
+    document.getElementById('resultBody').innerHTML = '';
+    document.getElementById('resultPanel').classList.remove('active');
+    switchView('select');
+    showToast('条件をリセットしました');
+  });
 
   loadData();
 })();

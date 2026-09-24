@@ -116,15 +116,17 @@ vercel            # プロジェクトルート（このフォルダ）で実行
    - Access は **Public** を選択
    - 「Add a read-write token env var to this connection」に**チェック**
      （環境変数 `BLOB_READ_WRITE_TOKEN` が自動追加される）
-2. **Settings → Environment Variables** で `UPLOAD_PASSPHRASE` を追加する
-   （値＝アップロード用の合言葉。研究室メンバーにだけ共有する）
-3. 環境変数を追加・変更したら **Redeploy** する（反映には再デプロイが必要）
+2. 環境変数を追加・変更したら **Redeploy** する（反映には再デプロイが必要）
 
 仕組み: 画像はブラウザ側で長辺512pxに縮小 → `POST /api/photo?slot=<名前>` →
-合言葉をサーバーで照合 → Blob に `photos/<slot>.jpg` として上書き保存 →
-以後の訪問者は `GET /api/photo?slot=<名前>` 経由で同じ写真を見る。
+Blob に `photos/<slot>.jpg` として上書き保存 → 以後の訪問者は
+`GET /api/photo?slot=<名前>` 経由で同じ写真を見る。
 サーバーに繋がらないローカル確認時は、従来どおりその端末の localStorage に
 保存されるフォールバック動作になる。
+
+**⚠️ 合言葉なし**: 現在アップロードに認証はかかっていません。サイトを開ける人なら
+誰でも各スロットの写真を上書きできます。いたずら防止が必要になった場合は、
+`api/photo.js` に合言葉チェックを再度実装できます。
 
 ## 今後 TODO（サイト運用者向け）
 

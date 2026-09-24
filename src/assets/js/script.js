@@ -77,14 +77,13 @@
   /* ---- Photo slots（全員共有） ------------------------------------------------
    * [data-photo-slot] の付いたボタンをクリックすると画像選択ダイアログが開き、
    * 縮小した写真を /api/photo（Vercel Blob）へアップロードして全訪問者に共有する。
-   * アップロードには合言葉（サーバー側の環境変数 UPLOAD_PASSPHRASE）が必要。
+   * 合言葉なし。サイトを開ける人なら誰でもアップロード・上書きできます。
    * サーバーに繋がらない場合（ローカル確認時など）は従来どおり
    * localStorage に保存し、その端末でだけ表示するフォールバックで動く。
    * ------------------------------------------------------------------------ */
   var PHOTO_KEY_PREFIX = "yahagi-photo-";
   var PHOTO_MAX_DIM = 512; // アップロード前にこのサイズまで縮小（転送量・容量対策）
   var PHOTO_API = "/api/photo";
-  var PASS_SESSION_KEY = "yahagi-upload-pass"; // 同じタブ内での合言葉の再入力を省略
 
   function applyPhoto(slot, url) {
     var img = slot.querySelector("img");
@@ -142,40 +141,18 @@
 
     function uploadPhoto(slot, dataUrl) {
       var name = slot.getAttribute("data-photo-slot");
-      var pass = null;
-      try {
-        pass = sessionStorage.getItem(PASS_SESSION_KEY);
-      } catch (err) {
-        pass = null;
-      }
-      if (!pass) {
-        pass = window.prompt(
-          "写真を全員に共有します。アップロード用の合言葉を入力してください："
-        );
-        if (pass === null || pass === "") return; // キャンセル
-      }
 
       fetch(PHOTO_API + "?slot=" + encodeURIComponent(name), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passphrase: pass, dataUrl: dataUrl }),
+        body: JSON.stringify({ dataUrl: dataUrl }),
       })
         .then(function (r) {
           if (r.ok) return r.json();
-          if (r.status === 401) {
-            try {
-              sessionStorage.removeItem(PASS_SESSION_KEY);
-            } catch (err) { /* ignore */ }
-            window.alert("合言葉が違います。");
-            throw new Error("handled");
-          }
           window.alert("アップロードに失敗しました（コード: " + r.status + "）。");
           throw new Error("handled");
         })
         .then(function (data) {
-          try {
-            sessionStorage.setItem(PASS_SESSION_KEY, pass);
-          } catch (err) { /* ignore */ }
           /* キャッシュを避けるためクエリを付けて即時反映 */
           applyPhoto(slot, data.url + "?v=" + Date.now());
         })

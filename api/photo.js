@@ -3,13 +3,12 @@
  *
  * GET  /api/photo?slot=<name>  … そのスロットの現在の写真URLを返す { url: string|null }
  * POST /api/photo?slot=<name>  … 写真をアップロードして全訪問者に共有する
- *   body: { passphrase: string, dataUrl: "data:image/jpeg;base64,..." }
- *   - passphrase は Vercel の環境変数 UPLOAD_PASSPHRASE と照合（いたずら防止）
+ *   body: { dataUrl: "data:image/jpeg;base64,..." }
+ *   - 合言葉なし。サイトを開ける人なら誰でも上書きできます。
  *   - 画像は Vercel Blob に photos/<slot>.jpg として上書き保存される
  *
  * 必要な環境変数（Vercel ダッシュボード → Settings → Environment Variables）:
  *   - BLOB_READ_WRITE_TOKEN … Blob Store をプロジェクトに接続すると自動追加
- *   - UPLOAD_PASSPHRASE     … アップロード用の合言葉（手動で追加する）
  */
 import { put, list } from "@vercel/blob";
 
@@ -35,15 +34,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const expected = process.env.UPLOAD_PASSPHRASE;
-    if (!expected) {
-      return res.status(503).json({ error: "UPLOAD_PASSPHRASE not configured" });
-    }
-
-    const { passphrase, dataUrl } = req.body || {};
-    if (passphrase !== expected) {
-      return res.status(401).json({ error: "wrong passphrase" });
-    }
+    const { dataUrl } = req.body || {};
     if (typeof dataUrl !== "string" || !dataUrl.startsWith(DATA_URL_PREFIX)) {
       return res.status(400).json({ error: "invalid image (expected jpeg data URL)" });
     }

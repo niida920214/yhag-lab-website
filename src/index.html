@@ -45,8 +45,9 @@
       <div class="brand-group">
         <!-- ============================================================
              ロゴ写真スロット（クリックで画像をアップロード・全員に共有）
-             ・クリックすると画像選択→合言葉入力→アップロードの流れで、
+             ・クリックすると画像選択→アップロードの流れで、
                写真がサーバー（Vercel Blob）に保存され全訪問者に表示されます。
+               （合言葉なし。サイトを開ける人なら誰でも上書きできます）
              ・サーバー未接続時（ローカル確認など）はその端末のブラウザに
                のみ保存されるフォールバック動作になります。
              ・写真未設定の間は assets/images/logo.png（無ければ白い角丸の
@@ -56,7 +57,7 @@
           type="button"
           class="brand-logo-slot"
           data-photo-slot="logo"
-          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
+          title="クリックで写真を設定（全員に共有されます）"
           aria-label="ロゴ写真を設定"
         >
           <img
@@ -117,14 +118,14 @@
   <main id="main-content">
     <!-- ================= 中央ヒーロー：タイトル + 写真スロット×2 =================
          タイトル両脇の枠はクリックで写真をアップロードして飾れる交流スペース。
-         合言葉を入れてアップロードすると全訪問者に共有されます（Vercel Blob保存）。 -->
+         アップロードすると全訪問者に共有されます（Vercel Blob保存・合言葉なし）。 -->
     <section class="hero-zoo">
       <div class="container hero-zoo-row">
         <button
           type="button"
           class="photo-slot photo-slot--hero"
           data-photo-slot="hero-left"
-          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
+          title="クリックで写真を設定（全員に共有されます）"
           aria-label="左側の写真を設定"
         >
           <span class="photo-slot-placeholder">
@@ -140,7 +141,7 @@
           type="button"
           class="photo-slot photo-slot--hero"
           data-photo-slot="hero-right"
-          title="クリックで写真を設定（合言葉が必要・全員に共有されます）"
+          title="クリックで写真を設定（全員に共有されます）"
           aria-label="右側の写真を設定"
         >
           <span class="photo-slot-placeholder">
@@ -191,6 +192,7 @@
                 <a class="tool-btn" href="https://railisland.tw/" target="_blank" rel="noopener noreferrer">
                   <i data-lucide="train-front"></i>
                   軌島
+                  <span class="new-badge">NEW!</span>
                 </a>
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© niida</p>
@@ -263,6 +265,7 @@
                 <a class="tool-btn" href="https://scholar.google.com/" target="_blank" rel="noopener noreferrer">
                   <i data-lucide="search"></i>
                   Google Scholar
+                  <span class="new-badge">NEW!</span>
                 </a>
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© miwa</p>
@@ -360,6 +363,7 @@
                 <a class="tool-btn" href="tools/mfc-selector-shared.html">
                   <i data-lucide="gauge"></i>
                   MFC Selector
+                  <span class="new-badge">NEW!</span>
                 </a>
                 <div class="tool-btn-meta">
                   <p class="tool-btn-author">© umetsu</p>
