@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight Sim — Google 3D Tiles</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono&display=swap" rel="stylesheet">
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <style>
+    :root {
+      --hud: #8dffb0;
+      --panel: rgba(6, 18, 12, 0.78);
+      --ink: #e6f2ea;
+      --muted: #9db3a6;
+      --line: rgba(141, 255, 176, 0.35);
+    }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    body { font-family: "B612", "Hiragino Sans", "Yu Gothic UI", sans-serif; color: var(--ink); }
+    #cesium { position: fixed; inset: 0; }
+    .cesium-viewer-bottom { opacity: 0.6; }
+    #hud { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    .panel {
+      position: fixed; background: var(--panel); border: 1px solid var(--line);
+      border-radius: 4px; backdrop-filter: blur(6px);
+    }
+    #overlay, #loading {
+      left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: min(440px, 86vw); padding: 22px 26px;
+    }
+    #overlay h2, #loading h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; color: var(--hud); }
+    #overlay p, #loading p { margin: 0; line-height: 1.7; color: var(--ink); }
+
+    #paused {
+      left: 50%; top: 96px; transform: translateX(-50%);
+      padding: 6px 16px; color: var(--hud); letter-spacing: 0.08em;
+    }
+
+    #help { right: 16px; top: 16px; padding: 14px 18px; max-width: 300px; font-size: 13px; max-height: 50vh; overflow-y: auto; }
+    #help h3 { margin: 0 0 8px; font-size: 14px; color: var(--hud); font-weight: 700; }
+    #help dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+    #help dt { font-family: "B612 Mono", monospace; color: var(--hud); white-space: nowrap; }
+    #help dd { margin: 0; color: var(--ink); }
+    #help .note { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
+    /* ---- コックピットパネル ---- */
+    #cockpit {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(180deg, rgba(8,14,12,0.86), rgba(6,10,9,0.96));
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+      display: grid; grid-template-rows: minmax(0, 1fr) auto;
+      height: min(330px, 42vh);
+      z-index: 5;
+    }
+    .cp-screens {
+      display: grid; grid-template-columns: 1.15fr 1fr 0.8fr; gap: 8px;
+      padding: 8px 10px 0; min-height: 0;
+    }
+    .cp-canvas {
+      width: 100%; height: 100%; min-height: 0;
+      background: #06110c; border: 1px solid var(--line); border-radius: 3px;
+    }
+    .cp-panel {
+      display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px;
+      padding: 8px 10px 10px;
+    }
+    .cp-group {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 5px 9px; border: 1px solid var(--line); border-radius: 3px;
+      background: rgba(255,255,255,0.02);
+    }
+    .cp-label { font-size: 10px; letter-spacing: 0.1em; color: var(--muted); }
+    .cp-lever, .cp-sw, .cp-step {
+      font-family: "B612 Mono", monospace; font-size: 12px;
+      color: var(--ink); background: #16221c; border: 1px solid var(--line);
+      border-radius: 3px; padding: 5px 10px; cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .cp-sw.cp-sm { padding: 5px 7px; font-size: 11px; }
+    .cp-lever:hover, .cp-sw:hover, .cp-step:hover { background: #22332a; }
+    .cp-sw.on { background: var(--hud); color: #04150b; border-color: var(--hud); font-weight: 700; }
+    .cp-lever { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 76px; }
+    .cp-lever::after { content: "UP"; }
+    .cp-lever.on::after { content: "DOWN"; }
+    .cp-lever span {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ffc65c; box-shadow: 0 0 6px #ffc65c;
+    }
+    .cp-lever.on span { background: var(--hud); box-shadow: 0 0 6px var(--hud); }
+    .cp-flaps { display: flex; align-items: center; gap: 4px; }
+    .cp-readout {
+      font-family: "B612 Mono", monospace; font-size: 12px; color: var(--hud);
+      min-width: 54px; text-align: center; padding: 4px 0;
+      background: #06110c; border: 1px solid var(--line); border-radius: 3px;
+    }
+    .cp-ap { flex: 1 1 320px; }
+    .cp-aprow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .cp-field { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+    .cp-field input {
+      width: 62px; font-family: "B612 Mono", monospace; font-size: 12px;
+      color: var(--hud); background: #06110c; border: 1px solid var(--line);
+      border-radius: 3px; padding: 4px 5px;
+    }
+    .cp-lights { display: flex; gap: 4px; }
+    @media (max-width: 760px) {
+      #cockpit { height: min(300px, 52vh); }
+      .cp-screens { grid-template-columns: 1fr 1fr; }
+      .cp-canvas[data-inst="eng"] { display: none; }
+    }
+
+    body.mouse-mode, body.mouse-mode #cesium, body.mouse-mode canvas { cursor: crosshair; }
+    [hidden] { display: none !important; }
+  </style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+  <div id="cesium"></div>
+  <canvas id="hud"></canvas>
+
+  <div id="loading" class="panel">
+    <h2>地形を読み込んでいます</h2>
+    <p>開始地点周辺の3Dタイルを取得中です．数秒〜十数秒かかります．</p>
+  </div>
+
+  <div id="overlay" class="panel" hidden>
+    <h2 id="overlay-title"></h2>
+    <p id="overlay-body"></p>
+  </div>
+
+  <div id="paused" class="panel" hidden>一時停止中</div>
+
+  <div id="cockpit"></div>
+
+  <aside id="help" class="panel">
+    <h3>操作</h3>
+    <dl>
+      <dt>↑ ↓</dt><dd>機首下げ／機首上げ（離しても舵はそのまま）</dd>
+      <dt>← →</dt><dd>左右に傾ける（ロール）</dd>
+      <dt>A D</dt><dd>ラダー，地上では前輪ステア</dd>
+      <dt>C</dt><dd>操縦桿とラダーを中立に戻す</dd>
+      <dt>M</dt><dd>キーボード操縦／マウス操縦の切り替え</dd>
+      <dt>J</dt><dd>コックピットパネルの表示切替</dd>
+      <dt>K</dt><dd>オートパイロット</dd>
+      <dt>L</dt><dd>着陸灯</dd>
+      <dt>ホイール</dt><dd>スロットル（マウス操縦時）</dd>
+      <dt>W S</dt><dd>スロットル増減</dd>
+      <dt>[ ]</dt><dd>ピッチトリム（下げ／上げ）</dd>
+      <dt>F / E</dt><dd>フラップを下げる／上げる</dd>
+      <dt>G</dt><dd>脚の上げ下げ</dd>
+      <dt>B / Space</dt><dd>ブレーキ</dd>
+      <dt>V</dt><dd>視点切替（後方／コックピット）</dd>
+      <dt>P</dt><dd>一時停止</dd>
+      <dt>R</dt><dd>最初からやり直す</dd>
+      <dt>H</dt><dd>この表示を隠す</dd>
+    </dl>
+    <p class="note">マウス操縦では，カーソルの位置がそのまま操縦桿になります（画面中央が中立，下へ動かすと機首上げ）．キーボード操縦では，舵は押した分だけ動いて保持されます．画面下中央の四角が操縦桿の位置です．離陸は，フラップを下げてスロットル全開，大型機は約140ノットで↓を少し引き，機首を8°前後まで上げます．</p>
+  </aside>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
