@@ -1374,8 +1374,8 @@
       +   '</select>'
       + '</label>'
       + '<div class="field-row3">'
-      +   '<label class="field"><span class="lab">流速(下限)</span><input type="number" id="'+p+'VelocityMin" class="mono" step="any" placeholder="例: 0.3"></label>'
-      +   '<label class="field"><span class="lab">流速(上限)</span><input type="number" id="'+p+'VelocityMax" class="mono" step="any" placeholder="例: 0.8"></label>'
+      +   '<label class="field"><span class="lab">流速(下限)</span><input type="number" id="'+p+'VelocityMin" class="mono" step="0.1" placeholder="例: 0.3"></label>'
+      +   '<label class="field"><span class="lab">流速(上限)</span><input type="number" id="'+p+'VelocityMax" class="mono" step="0.1" placeholder="例: 0.8"></label>'
       +   '<label class="field"><span class="lab">単位</span><select id="'+p+'VelUnit" class="mono"><option value="m/s">m/s</option><option value="cm/s">cm/s</option></select></label>'
       + '</div>'
       + '<div class="helptext" style="margin-top:-6px; margin-bottom:12px;">同じ値を上下限に入れれば単一流速として扱われます。範囲内のどの流速でも使えるMFCを探します。</div>'
@@ -1387,10 +1387,12 @@
       +     '<label class="field"><span class="lab">H数</span><input type="number" id="'+p+'FuelH" class="mono" step="1" min="0" value="0"></label>'
       +     '<label class="field"><span class="lab">O数</span><input type="number" id="'+p+'FuelO" class="mono" step="1" min="0" value="0"></label>'
       +   '</div>'
-      +   '<div class="field-row">'
+      +   '<div class="field-row3">'
       +     '<label class="field"><span class="lab">酸化剤</span><select id="'+p+'Oxidizer" class="mono"><option value="Air">Air(空気)</option><option value="O2">O2(純酸素)</option></select></label>'
-      +     '<label class="field"><span class="lab">当量比 &phi;</span><input type="number" id="'+p+'Phi" class="mono" step="any" placeholder="例: 1.0"></label>'
+      +     '<label class="field"><span class="lab">当量比 &phi;(下限)</span><input type="number" id="'+p+'PhiMin" class="mono" step="0.1" placeholder="例: 0.8"></label>'
+      +     '<label class="field"><span class="lab">当量比 &phi;(上限)</span><input type="number" id="'+p+'PhiMax" class="mono" step="0.1" placeholder="例: 1.2"></label>'
       +   '</div>'
+      +   '<div class="helptext" style="margin-top:-6px; margin-bottom:8px;">同じ値を上下限に入れれば単一の当量比として扱われます。</div>'
       + '</div>'
 
       + '<div class="subgroup" id="'+p+'DiffGroup" style="display:none;">'
@@ -1519,20 +1521,30 @@
     if (flameType === 'premixed') {
       const fuel = getFuelDefFromSelect(p);
       const oxType = document.getElementById(p+'Oxidizer').value; // Air / O2
-      const phi = parseFloat(document.getElementById(p+'Phi').value);
-      if (isNaN(phi) || phi <= 0) return { error: streamLabel + ': 当量比を入力してください', components: [] };
+      const phiA = parseFloat(document.getElementById(p+'PhiMin').value);
+      const phiB = parseFloat(document.getElementById(p+'PhiMax').value);
+      if (isNaN(phiA) || isNaN(phiB) || phiA <= 0 || phiB <= 0) return { error: streamLabel + ': 当量比(下限・上限)を入力してください', components: [] };
+      const phiMin = Math.min(phiA, phiB), phiMax = Math.max(phiA, phiB);
 
       const a = stoichO2(fuel); // 1 mol燃料あたりの理論O2 mol数
       if (a <= 0) return { error: streamLabel + ': 燃料の組成(C,H,O)を確認してください', components: [] };
 
-      const molO2 = a / phi;
-      const molOxSupply = oxType === 'O2' ? molO2 : molO2 / AIR_O2_FRACTION;
-      const totalMol = 1 + molOxSupply;
-      const fuelFrac = 1 / totalMol;
-      const oxFrac = molOxSupply / totalMol;
+      // 当量比φに対する燃料・酸化剤の体積分率(φが大きいほど燃料分率は増え、酸化剤分率は減る)
+      const fracsAt = (phi) => {
+        const molO2 = a / phi;
+        const molOxSupply = oxType === 'O2' ? molO2 : molO2 / AIR_O2_FRACTION;
+        const totalMol = 1 + molOxSupply;
+        return { fuel: 1 / totalMol, ox: molOxSupply / totalMol };
+      };
+      const lo = fracsAt(phiMin), hi = fracsAt(phiMax);
+      const isPhiRange = Math.abs(phiMax - phiMin) > 1e-9;
 
-      components.push({ label: streamLabel + ' / 燃料(' + fuel.name + ')', baseLabel: streamLabel + ' / 燃料(' + fuel.name + ')', gas: fuel.name, flowMin: totalRange.min * fuelFrac, flowMax: totalRange.max * fuelFrac, frac: fuelFrac, role: 'fuel' });
-      components.push({ label: streamLabel + ' / 酸化剤(' + oxType + ')', baseLabel: streamLabel + ' / 酸化剤(' + oxType + ')', gas: oxType, flowMin: totalRange.min * oxFrac, flowMax: totalRange.max * oxFrac, frac: oxFrac, role: 'oxidizer' });
+      components.push({ label: streamLabel + ' / 燃料(' + fuel.name + ')', baseLabel: streamLabel + ' / 燃料(' + fuel.name + ')', gas: fuel.name,
+        flowMin: totalRange.min * lo.fuel, flowMax: totalRange.max * hi.fuel, frac: hi.fuel,
+        velCases: isPhiRange ? [{ label: '\u03c6=' + phiMin, frac: lo.fuel }, { label: '\u03c6=' + phiMax, frac: hi.fuel }] : null, role: 'fuel' });
+      components.push({ label: streamLabel + ' / 酸化剤(' + oxType + ')', baseLabel: streamLabel + ' / 酸化剤(' + oxType + ')', gas: oxType,
+        flowMin: totalRange.min * hi.ox, flowMax: totalRange.max * lo.ox, frac: lo.ox,
+        velCases: isPhiRange ? [{ label: '\u03c6=' + phiMin, frac: lo.ox }, { label: '\u03c6=' + phiMax, frac: hi.ox }] : null, role: 'oxidizer' });
     } else {
       const mg = getMainGasFromSelect(p);
       const conc = parseFloat(document.getElementById(p+'Conc').value);
@@ -1558,8 +1570,8 @@
       const isSplitRoleComp = comp.role === splitRole;
       const doSplit = isSplitRoleComp && (forceSplit !== undefined ? forceSplit : (needsSplit(comp.gas, comp.flowMin, comp.flowMax) && !canPartitionCover(comp.gas, comp.flowMin, comp.flowMax)));
       if (doSplit) {
-        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 1, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
-        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 2, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
+        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 1, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, velCases: comp.velCases ? comp.velCases.map(c => ({ label: c.label, frac: c.frac / 2 })) : null, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
+        expanded.push({ label: comp.label, baseLabel: comp.baseLabel, branch: 2, gas: comp.gas, flowMin: comp.flowMin / 2, flowMax: comp.flowMax / 2, frac: comp.frac / 2, velCases: comp.velCases ? comp.velCases.map(c => ({ label: c.label, frac: c.frac / 2 })) : null, role: comp.role, isSplitRole: true, autoSplit: true, stream: p });
       } else {
         comp.isSplitRole = isSplitRoleComp;
         comp.autoSplit = false;
@@ -1646,17 +1658,24 @@
     return { segments, complete: true };
   }
 
-  // 流量(sccm)から、そのコンポーネントが属する系統の流速に逆算して表示用の文字列を作る
-  function flowToVelocityLabel(stream, frac, flowSccmVal){
-    const areaMm2 = streamAreaMm2(stream);
-    if (!areaMm2 || !frac) return null;
-    const totalFlowSccm = flowSccmVal / frac;
+  // 流量(sccm)から、そのコンポーネントが属する系統の流速に逆算して表示用の文字列を作る。
+  // 当量比が範囲指定の場合は、当量比ごとの流速を併記する。to を省略すると単一の流量として扱う。
+  function velocityLabel(comp, from, to){
+    const areaMm2 = streamAreaMm2(comp.stream);
+    if (!areaMm2) return null;
     const areaM2 = mm2ToM2(areaMm2);
-    const velMs = totalFlowSccm / (areaM2 * 1e6 * 60);
-    const velUnitEl = document.getElementById(stream + 'VelUnit');
+    const velUnitEl = document.getElementById(comp.stream + 'VelUnit');
     const velUnit = velUnitEl ? velUnitEl.value : 'm/s';
-    const velDisp = velUnit === 'cm/s' ? velMs * 100 : velMs;
-    return velDisp.toFixed(3) + ' ' + velUnit;
+    const conv = (flow, frac) => {
+      const velMs = flow / frac / (areaM2 * 1e6 * 60);
+      return (velUnit === 'cm/s' ? velMs * 100 : velMs).toFixed(3);
+    };
+    const cases = comp.velCases || [{ label: '', frac: comp.frac }];
+    if (cases.some(c => !c.frac)) return null;
+    return cases.map(c => {
+      const txt = to === undefined ? conv(from, c.frac) : conv(from, c.frac) + ' &ndash; ' + conv(to, c.frac);
+      return (c.label ? c.label + ': ' : '') + txt + ' ' + velUnit;
+    }).join(' / ');
   }
 
   function matchMfcs(flowMin, flowMax, gasQuery, pressKPa, portsNeeded){
@@ -1860,14 +1879,13 @@
       const pctFSLow = cfgMaxSccm > 0 ? (seg.from / cfgMaxSccm) * 100 : 0;
       const pctFSHigh = cfgMaxSccm > 0 ? (seg.to / cfgMaxSccm) * 100 : 0;
       const fakeC = { m: seg.m, cfg: seg.cfg, pctFSLow, pctFSHigh, lowAccuracy: pctFSLow < 10 };
-      const velFrom = flowToVelocityLabel(comp.stream, comp.frac, seg.from);
-      const velTo = flowToVelocityLabel(comp.stream, comp.frac, seg.to);
+      const velRange = velocityLabel(comp, seg.from, seg.to);
 
       html += '<div class="split-slot-label" style="margin-bottom:4px;">区間 ' + (i+1) + '</div>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">'
         +   '<div style="padding:8px 10px; background:var(--panel-2); border-radius:var(--radius);">'
         +     '<div class="m-lab">流速</div>'
-        +     '<div class="mono" style="font-weight:700; font-size:13.5px;">' + (velFrom && velTo ? velFrom + ' &ndash; ' + velTo : '&mdash;') + '</div>'
+        +     '<div class="mono" style="font-weight:700; font-size:13.5px;">' + (velRange || '&mdash;') + '</div>'
         +   '</div>'
         +   '<div style="padding:8px 10px; background:var(--panel-2); border-radius:var(--radius);">'
         +     '<div class="m-lab">流量</div>'
@@ -1877,7 +1895,7 @@
         + candidateCardHtml(fakeC, { cls: '', tagCls: 'ok', tagText: '区間' + (i+1) + 'で使用' });
 
       if (i < partition.segments.length - 1) {
-        const switchVel = flowToVelocityLabel(comp.stream, comp.frac, seg.to);
+        const switchVel = velocityLabel(comp, seg.to);
         const switchFlow = fmtFlowLmin(seg.to);
         html += '<div style="display:flex; align-items:center; gap:8px; margin:4px 0 12px; padding:6px 10px; border-left:3px solid var(--accent); background:var(--panel-2); border-radius:var(--radius); font-size:12px; color:var(--ink-soft);">'
           + '<span style="font-weight:700; color:var(--accent-ink);">切替:</span>'
