@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>キャリアマネープラン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ---- 最小リセット ---- */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+
+/* Layout: 金融庁版と同じSTEP構成の入力（左）＋結果（右）．スマホは 結果→入力→年表→根拠 */
+:root{
+  --bg:#f3f5f6; --panel:#ffffff; --ink:#14191d; --ink-2:#4a545b; --ink-3:#6f7980;
+  --line:#dde2e5; --accent:#0e5e86; --accent-soft:#e3eef4; --warn:#b4541f; --hint-bg:#f6f8f9;
+  --s-nisa:#2a78d6; --s-tok:#eb6834; --s-cash:#1baf7a; --s-inc:#6250d6; --s-exp:#e34948; --s-faint:#c4cbd0;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121618; --panel:#1a1f22; --ink:#eef1f2; --ink-2:#b9c2c7; --ink-3:#919ba1;
+  --line:#2c3439; --accent:#5fb3dc; --accent-soft:#1d2d36; --warn:#e9895a; --hint-bg:#161b1e;
+  --s-nisa:#3987e5; --s-tok:#d95926; --s-cash:#199e70; --s-inc:#9085e9; --s-exp:#e66767; --s-faint:#3b454b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121618; --panel:#1a1f22; --ink:#eef1f2; --ink-2:#b9c2c7; --ink-3:#919ba1;
+  --line:#2c3439; --accent:#5fb3dc; --accent-soft:#1d2d36; --warn:#e9895a; --hint-bg:#161b1e;
+  --s-nisa:#3987e5; --s-tok:#d95926; --s-cash:#199e70; --s-inc:#9085e9; --s-exp:#e66767; --s-faint:#3b454b; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1220px;margin:0 auto;display:grid;gap:20px}
+header h1{font-size:1.5rem;margin:0;font-weight:700;text-wrap:balance;letter-spacing:.02em}
+header p{margin:4px 0 0;color:var(--ink-2);font-size:.9rem;max-width:66ch}
+.layout{display:grid;gap:20px;grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "in" "bottom"}
+@media (min-width:980px){.layout{grid-template-columns:400px minmax(0,1fr);grid-template-areas:"in top" "in bottom";align-items:start}
+  .inputs{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;padding-right:4px}}
+.top{grid-area:top}.bottom{grid-area:bottom}.inputs{grid-area:in}
+.top,.bottom,.inputs{min-width:0;display:grid;gap:16px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tile{background:var(--panel);padding:12px 14px}
+.tile .k{font-size:.72rem;color:var(--ink-3);letter-spacing:.06em}
+.tile .v{font-family:var(--f-num);font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}
+.tile .s{font-size:.75rem;color:var(--ink-2)}
+.tile .v.bad{color:var(--warn)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:.8rem;border:0;background:transparent;color:var(--ink-2);padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--ink-2);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.legend i.ln{height:2px;width:14px;vertical-align:3px}
+.chartbox{position:relative;margin-top:8px}
+svg{display:block;width:100%;height:auto}
+.axis text{fill:var(--ink-3);font-family:var(--f-num);font-size:11px}
+.grid line{stroke:var(--line)}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.78rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:160px;z-index:2}
+.tip .r{display:flex;justify-content:space-between;gap:12px;font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.tip .r span:first-child{font-family:var(--f-body);color:var(--ink-2)}
+h2{font-size:1rem;margin:0;font-weight:700}
+.note{font-size:.76rem;color:var(--ink-3);margin:6px 0 0}
+.tbl{overflow:auto;max-height:560px;margin-top:8px}
+table{border-collapse:collapse;font-size:.76rem;width:100%;white-space:nowrap}
+th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+td{font-family:var(--f-num)}
+th{position:sticky;top:0;background:var(--panel);color:var(--ink-2);font-weight:500;font-size:.7rem;z-index:1}
+td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
+th:first-child{z-index:2}
+tr.mark td{background:var(--accent-soft)}
+td.neg{color:var(--warn)}
+.src{font-size:.78rem;color:var(--ink-2)}
+.src table{white-space:normal;font-size:.76rem}
+.src td{font-family:var(--f-body);text-align:left;vertical-align:top}
+.src td:first-child{position:static;font-weight:500;color:var(--ink);min-width:7em}
+/* STEPタブ */
+.steps{scroll-margin-top:8px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.steps button{font:inherit;border:0;border-right:1px solid var(--line);background:transparent;color:var(--ink-2);padding:8px 2px;cursor:pointer;display:grid;line-height:1.3}
+.steps button:last-child{border-right:0}
+.steps button small{font-family:var(--f-num);font-size:.6rem;color:var(--ink-3);letter-spacing:.06em}
+.steps button span{font-size:.8rem;font-weight:500}
+.steps button[aria-selected="true"]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+.panel{display:grid;gap:12px}
+.panel:focus{outline:none}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0;display:grid;gap:12px;background:var(--panel);min-width:0}
+legend{font-size:.84rem;font-weight:700;padding:0 4px}
+fieldset.plus legend::after{content:"プラスα";font-size:.62rem;font-weight:500;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
+.f{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:4px 8px;align-items:center}
+.f>label{font-size:.82rem;color:var(--ink-2)}
+.f .h{grid-column:1/-1;font-size:.7rem;line-height:1.45;color:var(--ink-3);background:var(--hint-bg);border-radius:6px;padding:4px 8px}
+.f .h b{font-weight:500;color:var(--ink-2)}
+.f.wide{grid-template-columns:minmax(0,1fr)}
+input[type=number],input[type=text],select{font:inherit;font-size:.85rem;width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+input[type=number]{font-family:var(--f-num);text-align:right}
+.radio{display:flex;flex-wrap:wrap;gap:6px}
+.radio label{font-size:.8rem;border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);position:relative}
+.radio input{position:absolute;opacity:0;width:1px;height:1px}
+.radio label:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--ink);font-weight:700}
+.radio label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.mini{border:1px solid var(--line);border-radius:8px;padding:8px 8px 4px;background:var(--bg)}
+.mini .cap{font-size:.72rem;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mini .cap b{font-family:var(--f-num);font-weight:500;color:var(--ink)}
+.grade{display:grid;grid-template-columns:1.3fr .6fr .8fr .8fr .5fr;gap:4px;font-size:.7rem;align-items:center}
+.grade .gh{color:var(--ink-3)}
+.grade input{padding:4px 5px;font-size:.78rem}
+.kid{border-top:1px dashed var(--line);padding-top:10px;display:grid;gap:8px}
+.kid h4{margin:0;font-size:.82rem}
+.school{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.school label{font-size:.72rem;color:var(--ink-3);display:grid;gap:2px}
+.school select{padding:4px 6px;font-size:.78rem}
+.ev{display:grid;grid-template-columns:.7fr 1.6fr 1fr auto;gap:4px;align-items:center}
+.ev input{padding:4px 6px;font-size:.8rem}
+.inc{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:4px;align-items:end;border-top:1px dashed var(--line);padding-top:8px}
+.inc label{font-size:.68rem;color:var(--ink-3);display:grid;gap:2px}
+.inc .typ{grid-column:1/-2}
+.inc input,.inc select{padding:4px 6px;font-size:.8rem}
+.inc .tax{grid-column:1/-1;font-size:.7rem;color:var(--ink-2)}
+.btn{font:inherit;font-size:.8rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:5px 10px;cursor:pointer}
+.btn.x{padding:4px 8px;color:var(--ink-3)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.reset{color:var(--warn);border-color:var(--warn);background:transparent}
+.btn.reset.armed{background:var(--warn);color:var(--panel)}
+.look{display:grid;gap:12px}
+.lk{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:8px;align-items:center}
+@media (max-width:480px){.lk{grid-template-columns:minmax(0,1fr)}}
+.lkh{font-size:.8rem;color:var(--ink-2)}
+.sw{display:flex;flex-wrap:wrap;gap:8px}
+.sw button{font:inherit;font-size:.72rem;color:var(--ink-2);background:transparent;border:1px solid var(--line);border-radius:8px;padding:4px 8px 4px 4px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.sw button i{width:22px;height:22px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.12)}
+.sw button[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);box-shadow:0 0 0 1px var(--accent)}
+.cp{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--ink-2)}
+.cp input{width:38px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:transparent}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);font-size:.82rem;padding:8px 14px;border-radius:8px;z-index:20}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.off{opacity:.45;pointer-events:none}
+.nav{display:flex;justify-content:space-between;gap:8px}
+@media (prefers-reduced-motion:no-preference){.seg button,.steps button{transition:background .15s}}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="wrap">
+<header>
+  <div class="bar"><h1>キャリアマネープラン</h1><div class="row"><button class="btn" id="lookBtn" aria-expanded="false" aria-controls="look">表示設定</button><button class="btn reset" id="resetAll" data-label="すべてリセット">すべてリセット</button></div></div>
+  <div class="card look" id="look" hidden>
+    <div class="lk"><span class="lkh">明るさ</span>
+      <div class="seg" role="group" aria-label="明るさ"><button data-mode="auto">端末に合わせる</button><button data-mode="light">ライト</button><button data-mode="dark">ダーク</button></div></div>
+    <div class="lk"><span class="lkh">テーマ</span><div class="sw" id="swatches" role="group" aria-label="テーマ"></div></div>
+    <div class="lk"><span class="lkh">自分で色を選ぶ</span>
+      <div class="row"><label class="cp">背景<input type="color" id="cBg"></label><label class="cp">アクセント<input type="color" id="cAc"></label><button class="btn" id="cClear">テーマの色に戻す</button></div></div>
+    <p class="note" style="margin:0">表示設定はこの端末のブラウザに保存されます．「すべてリセット」では消えません．</p>
+  </div>
+  <p>就職してからの年収・手取り・支出・資産を，昇給のしかた，出張や寮，相続・贈与，NISAと特定口座の使い分けまで含めて1年ずつ試算します．業種を問わず使えます．各項目の下の小さな文字が入力の目安で，初期値の根拠はページの一番下にまとめています．</p>
+</header>
+
+<div class="layout">
+<section class="top">
+  <div class="tiles" id="tiles"></div>
+  <div class="card">
+    <div class="bar">
+      <h2>資産の推移</h2>
+      <div class="seg" role="group" aria-label="金額の表示">
+        <button id="mNom" aria-pressed="true">その年の金額</button>
+        <button id="mReal" aria-pressed="false">今の価値</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--s-nisa)"></i>NISA</span>
+      <span><i style="background:var(--s-tok)"></i>特定口座（税引後）</span>
+      <span><i style="background:var(--s-cash)"></i>現金</span>
+    </div>
+    <div class="chartbox" id="box1"><svg id="chart1" viewBox="0 0 760 300" role="img" aria-label="年齢ごとの資産の積み上げグラフ"></svg><div class="tip" id="tip1" hidden></div></div>
+    <p class="note" id="note1"></p>
+  </div>
+  <div class="card">
+    <h2>収入と支出</h2>
+    <div class="legend">
+      <span><i class="ln" style="background:var(--s-inc)"></i>世帯の手取り収入（年金・手当・相続や贈与を含む）</span>
+      <span><i class="ln" style="background:var(--s-exp)"></i>支出（投資を除く）</span>
+    </div>
+    <div class="chartbox" id="box2"><svg id="chart2" viewBox="0 0 760 240" role="img" aria-label="年齢ごとの収入と支出の折れ線グラフ"></svg><div class="tip" id="tip2" hidden></div></div>
+  </div>
+</section>
+
+<section class="inputs">
+  <div class="steps" role="tablist" aria-label="入力のステップ">
+    <button role="tab" id="t1" aria-controls="p1"><small>STEP 1</small><span>ご自身</span></button>
+    <button role="tab" id="t2" aria-controls="p2"><small>STEP 2</small><span>配偶者</span></button>
+    <button role="tab" id="t3" aria-controls="p3"><small>STEP 3</small><span>こども</span></button>
+    <button role="tab" id="t4" aria-controls="p4"><small>STEP 4</small><span>くらし</span></button>
+    <button role="tab" id="t5" aria-controls="p5"><small>STEP 5</small><span>運用</span></button>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="panel" role="tabpanel" id="p1">
+    <fieldset><legend>ご自身について</legend>
+      <div class="f"><label for="entryAge">入社時の年齢</label><input type="number" id="entryAge"><p class="h">学部卒は22〜23歳，修士卒は24〜25歳が目安です．</p></div>
+      <div class="f"><label for="entryYear">入社年（4月）</label><input type="number" id="entryYear"></div>
+      <div class="f"><label for="retireAge">何歳まで働くか（定年）</label><input type="number" id="retireAge"><p class="h">定年は60歳の会社が多く，65歳までの再雇用が義務になっています．定年を65歳に延ばす会社も増えています．</p></div>
+      <div class="f"><label for="reemp">定年後の再雇用の年収（万円）</label><input type="number" id="reemp"><p class="h">年金が始まるまで働く想定です．定年前より下がるのが一般的です．今の価値で入力．</p></div>
+      <div class="f"><label for="sev">退職金（万円）</label><input type="number" id="sev"><p class="h">大学・大学院卒の定年退職者の平均は<b>1,896万円</b>（就労条件総合調査 2023年）．今の価値で入力し，退職所得控除で課税します．</p></div>
+      <div class="f"><label for="initAssets">入社時の現金・預金（万円）</label><input type="number" id="initAssets"><p class="h">学生時代の貯金など．</p></div>
+      <div class="f"><label for="initNisaVal">入社時のNISAの評価額（万円）</label><input type="number" id="initNisaVal"><p class="h">証券口座の「評価額」．すでにNISAで積み立てている場合に入力します．</p></div>
+      <div class="f"><label for="initNisaCost">うちNISAで買った金額の合計（万円）</label><input type="number" id="initNisaCost"><p class="h">証券口座の「取得金額」や「簿価」．生涯枠1,800万円の残りの計算に使います．0のときは評価額と同じとみなします．</p></div>
+      <div class="f"><label for="initTokVal">入社時の特定口座・一般口座の評価額（万円）</label><input type="number" id="initTokVal"><p class="h">NISA以外で持っている株式や投資信託．</p></div>
+      <div class="f"><label for="initTokCost">うち買った金額の合計（万円）</label><input type="number" id="initTokCost"><p class="h">売却するときの利益（評価額−取得金額）に20.315%の税金がかかります．0のときは評価額と同じとみなします．</p></div>
+    </fieldset>
+
+    <fieldset><legend>給与の入力方法</legend>
+      <div class="radio" role="radiogroup" aria-label="給与の入力方法">
+        <label><input type="radio" name="payMode" value="simple"><span>かんたん（年収と統計カーブ）</span></label>
+        <label><input type="radio" name="payMode" value="grade"><span>詳しく（等級ごとの月給）</span></label>
+      </div>
+      <div id="simpleBox" style="display:grid;gap:12px">
+        <div class="f"><label for="initIncome">1年目の年収（額面・万円）</label><input type="number" id="initIncome"><p class="h">月給×12＋賞与＋残業代．大卒の初任給は月20万円台後半，大企業の修士卒は30万円前後が目安です．1年目は賞与が少ない会社が多いので，2年目の想定年収を入れるとずれが小さくなります．</p></div>
+        <div class="f"><label for="myCurve">年収の伸び方</label><select id="myCurve"></select><p class="h">厚生労働省「賃金構造基本統計調査」（2025年）の年齢別賃金から作った伸び方です．下のグラフで形を見比べられます．</p></div>
+      </div>
+      <div id="gradeBox" style="display:grid;gap:12px">
+        <div class="f"><label for="gradePreset">等級表のひな形</label><select id="gradePreset"><option value="">選んで読み込む</option><option value="heavy">大手重工メーカーの例</option><option value="generic">一般的な大企業の例</option></select><p class="h">ひな形を読み込んでから，自分の会社に合わせて書き換えてください．大手重工メーカーの例は，公開されている初任給と口コミから推定したものです．</p></div>
+        <div class="grade" id="grades"></div>
+        <p class="note" style="margin:0">月給は等級の中で開始額から終了額まで直線的に上がります．管理職にチェックを入れた等級は残業代と出張が付きません．金額は今の価値です．</p>
+        <div class="f"><label for="bonusM">賞与（月給の何ヶ月分）</label><input type="number" step="0.1" id="bonusM"><p class="h">大企業は年4〜6ヶ月分が多いです．会社の募集要項の「賞与」欄で確認できます．</p></div>
+        <div class="f"><label for="y1Summer">1年目夏の一時金（万円）</label><input type="number" id="y1Summer"><p class="h">夏の賞与の代わりに出る寸志．ない会社は0．</p></div>
+        <div class="f"><label for="y1WinterM">1年目冬の賞与（ヶ月）</label><input type="number" step="0.1" id="y1WinterM"></div>
+        <div class="f"><label for="otDom">残業（時間/月）</label><input type="number" id="otDom"><p class="h">全国の一般労働者の平均は月10〜15時間ほど（毎月勤労統計）．会社の募集要項に「平均残業時間」が書かれていることが多いです．</p></div>
+      </div>
+      <div class="mini"><div class="cap"><span>この設定での年収（額面・今の価値）</span><span>ピーク <b id="myPeak"></b></span></div><svg id="myMini" viewBox="0 0 360 150" role="img" aria-label="年収の推移"></svg></div>
+      <div class="f"><label for="wageG">ベースアップ率（%/年）</label><input type="number" step="0.1" id="wageG"><p class="h">昇格・年齢による昇給とは別の，給与水準全体の上昇です．物価と同じ2%にすると，上のグラフの形のまま名目額が増えます．</p></div>
+    </fieldset>
+
+    <fieldset class="plus"><legend>出張・海外赴任</legend>
+      <div class="row" role="group" aria-label="出張月数のプリセット">
+        <button class="btn" data-preset="0">出張なし</button>
+        <button class="btn" data-preset="3">年3ヶ月</button>
+        <button class="btn" data-preset="6">年6ヶ月</button>
+      </div>
+      <div class="f"><label for="abroadM">長期出張の月数（ヶ月/年）</label><input type="number" id="abroadM"></div>
+      <div class="f"><label for="abroadFrom">出張がある年次（から）</label><input type="number" id="abroadFrom"></div>
+      <div class="f"><label for="abroadTo">出張がある年次（まで）</label><input type="number" id="abroadTo"></div>
+      <div class="f"><label for="otAbr">出張中の残業＋休日出勤（時間/月）</label><input type="number" id="otAbr"><p class="h">「詳しく」のときだけ使います．残業の上限規制（特別条項でも複数月平均80時間）があるので，80時間までが目安です．</p></div>
+      <div class="f"><label for="allow">出張手当（万円/月）</label><input type="number" id="allow"><p class="h">日当は社内規程の範囲なら非課税なので，そのまま手取りに足します．今の価値で入力．</p></div>
+    </fieldset>
+
+    <fieldset><legend>給与以外の収入</legend>
+      <div class="f"><label for="otherInc">毎年の副収入（万円/年）</label><input type="number" id="otherInc"><p class="h">副業や不動産収入など，税金を引いた後の金額．</p></div>
+      <div class="f"><label for="otherTo">副収入がある年齢（まで）</label><input type="number" id="otherTo"></div>
+      <div id="incs" style="display:grid;gap:8px"></div>
+      <button class="btn" id="addInc" style="justify-self:start">相続・贈与などを追加</button>
+      <p class="note" style="margin:0">相続は税引後の受取額を入れてください（基礎控除は3,000万円＋600万円×法定相続人の数で，多くの家庭は相続税がかかりません）．贈与は贈与税を自動で計算します．金額は今の価値です．</p>
+    </fieldset>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="panel" role="tabpanel" id="p2" hidden>
+    <fieldset><legend>配偶者について</legend>
+      <div class="radio" role="radiogroup" aria-label="配偶者の有無">
+        <label><input type="radio" name="spOn" value="0"><span>なし</span></label>
+        <label><input type="radio" name="spOn" value="1"><span>あり（結婚予定を含む）</span></label>
+      </div>
+      <div id="spFields" style="display:grid;gap:12px">
+        <div class="f"><label for="marryAge">結婚する年齢（ご自身）</label><input type="number" id="marryAge"><p class="h">初婚年齢の平均は男性31歳，女性29歳台です（人口動態統計）．</p></div>
+        <div class="f"><label for="spDiff">配偶者との年齢差</label><input type="number" id="spDiff"><p class="h">配偶者が年下ならマイナス．</p></div>
+        <div class="f"><label for="spJob">配偶者の職業</label><select id="spJob"><option value="emp">会社員・公務員</option><option value="self">自営業・フリーランス</option><option value="home">専業主婦・主夫</option></select></div>
+        <div class="f"><label for="spInc">結婚時の年収（額面・万円）</label><input type="number" id="spInc"><p class="h">今の価値で入力．</p></div>
+        <div class="f"><label for="spCurve">年収の伸び方</label><select id="spCurve"></select></div>
+        <div class="mini"><div class="cap"><span>配偶者の年収（額面・今の価値）</span><span>ピーク <b id="spPeak"></b></span></div><svg id="spMini" viewBox="0 0 360 150" role="img" aria-label="配偶者の年収の推移"></svg></div>
+        <div class="f"><label for="spStart">配偶者が働き始めた年齢</label><input type="number" id="spStart"><p class="h">厚生年金の加入期間の計算に使います．</p></div>
+        <div class="f"><label for="spRetire">配偶者が何歳まで働くか</label><input type="number" id="spRetire"></div>
+        <div class="f"><label for="spSev">配偶者の退職金（万円）</label><input type="number" id="spSev"></div>
+        <div class="f"><label for="spLeave">出産した年の年収（%）</label><input type="number" id="spLeave"><p class="h">育児休業給付は休業前の賃金の67%（最初の180日）で非課税です．1年休む場合の目安として67%にしています．</p></div>
+      </div>
+    </fieldset>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="panel" role="tabpanel" id="p3" hidden>
+    <fieldset><legend>こどもについて</legend>
+      <div class="f"><label for="kidN">こどもの人数</label><select id="kidN"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+      <div id="kids" style="display:grid;gap:10px"></div>
+      <div class="f"><label for="shiokuri">大学で下宿する場合の仕送り（万円/年）</label><input type="number" id="shiokuri"><p class="h">初期値の90万円は月7.5万円の想定です．家賃の相場に合わせて調整してください．</p></div>
+      <p class="note" style="margin:0">こどもの生活費は，家計調査の世帯人数別の支出から自動で増やします（STEP 4）．児童手当（3歳未満 月1.5万円，高校生年代まで月1万円，第3子以降 月3万円）を収入に入れています．</p>
+    </fieldset>
+    <fieldset class="plus"><legend>学費の年額（万円・今の価値）</legend>
+      <div id="eduTbl" style="display:grid;gap:8px"></div>
+      <p class="note" style="margin:0">幼稚園〜高校は文部科学省「子供の学習費調査」（2023年度）の学習費総額．塾や習い事を含みます．大学は授業料・入学金などの4年平均の目安です．</p>
+    </fieldset>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="panel" role="tabpanel" id="p4" hidden>
+    <fieldset><legend>住まい</legend>
+      <div class="f"><label for="dormUntil">社員寮・社宅を出る年齢</label><input type="number" id="dormUntil"><p class="h">寮がない場合は入社時の年齢と同じにしてください．結婚したら寮は出る想定です．</p></div>
+      <div class="f"><label for="dormFee">寮費（万円/月）</label><input type="number" step="0.1" id="dormFee"><p class="h">大手メーカーの独身寮は月1〜3万円程度が多いです．長期出張の月は不要として計算します．</p></div>
+      <div class="f"><label for="rent">一人暮らしの家賃（万円/月）</label><input type="number" step="0.1" id="rent"><p class="h">住宅手当を引いた自己負担分．今の価値で入力．</p></div>
+      <div class="f"><label for="rentM">結婚後の家賃（万円/月）</label><input type="number" step="0.1" id="rentM"><p class="h">世帯の負担分．地方の2LDKで8〜12万円，都市部では15万円以上が目安です．</p></div>
+      <div class="radio" role="radiogroup" aria-label="住宅購入の予定">
+        <label><input type="radio" name="buyOn" value="0"><span>購入しない</span></label>
+        <label><input type="radio" name="buyOn" value="1"><span>購入する</span></label>
+      </div>
+      <div id="buyFields" style="display:grid;gap:12px">
+        <div class="f"><label for="buyAge">購入する年齢</label><input type="number" id="buyAge"></div>
+        <div class="f"><label for="buyPrice">購入価格（万円）</label><input type="number" id="buyPrice"><p class="h">フラット35利用者の全国平均は，土地付注文住宅5,007万円・建売住宅3,826万円・マンション5,592万円・中古マンション3,033万円（2024年度）．その年の価格で入力．</p></div>
+        <div class="f"><label for="buyDown">頭金（万円）</label><input type="number" id="buyDown"><p class="h">価格の1〜2割が一般的です．購入した年の支出に入ります．</p></div>
+        <div class="f"><label for="loanRate">ローン金利（%）</label><input type="number" step="0.05" id="loanRate"></div>
+        <div class="f"><label for="loanYears">返済期間（年）</label><input type="number" id="loanYears"></div>
+        <div class="f"><label for="upkeep">維持費（価格の%/年）</label><input type="number" step="0.1" id="upkeep"><p class="h">固定資産税・火災保険・修繕積立など．金融庁のシミュレーターと同じ1%にしています．</p></div>
+      </div>
+    </fieldset>
+    <fieldset><legend>生活費（住居費・学費を除く）</legend>
+      <div class="f"><label for="liv1">単身・34歳以下（万円/月）</label><input type="number" step="0.01" id="liv1"><p class="h">単身で働く人の消費支出は<b>月17.92万円</b>（家計調査 2025年）．ここから住居費を約3.5万円（推定）引いた額です．</p></div>
+      <div class="f"><label for="liv2">単身・35歳以上（万円/月）</label><input type="number" step="0.01" id="liv2"><p class="h">35〜59歳の単身勤労者は<b>月20.57万円</b>（同）．同じく住居費を引いた額です．</p></div>
+      <div class="f"><label for="extra">生活費の上乗せ（%）</label><input type="number" id="extra"><p class="h">平均より多く使う想定なら30%など．世帯人数が増えても同じ率で上乗せします．</p></div>
+      <div class="f wide"><label>世帯人数ごとの生活費の倍率（単身＝1）</label>
+        <div class="grade" style="grid-template-columns:repeat(4,minmax(0,1fr))" id="hhMult"></div>
+        <p class="h">世帯人数別の消費支出は 1人17.3万円・2人28.1万円・3人32.4万円・4人36.3万円（家計調査 2025年）．この比が初期値です．配偶者と，22歳以下で同居しているこどもを人数に数えます．</p></div>
+      <div class="f"><label for="special">毎年の特別費（万円/年）</label><input type="number" id="special"><p class="h">旅行・家電・冠婚葬祭など．金融庁のシミュレーターの記入例では年60万円．</p></div>
+    </fieldset>
+    <fieldset><legend>車と大きな支出</legend>
+      <div class="f"><label for="carAge">車を最初に買う年齢</label><input type="number" id="carAge"><p class="h">0にすると車なし．地方勤務では必要になることが多いです．</p></div>
+      <div class="f"><label for="carEvery">買い替えの間隔（年）</label><input type="number" id="carEvery"><p class="h">乗り換えは7〜10年ごとが多いです．</p></div>
+      <div class="f"><label for="carCost">1台の価格（万円）</label><input type="number" id="carCost"></div>
+      <div class="f"><label for="carUntil">最後に買う年齢</label><input type="number" id="carUntil"></div>
+      <div id="events" style="display:grid;gap:6px"></div>
+      <button class="btn" id="addEv" style="justify-self:start">支出を追加</button>
+    </fieldset>
+    <fieldset><legend>物価</legend>
+      <div class="f"><label for="infl">物価上昇率（%/年）</label><input type="number" step="0.1" id="infl"><p class="h">日本銀行の目標は2%．生活費・家賃・学費をこの率で増やします．</p></div>
+    </fieldset>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="panel" role="tabpanel" id="p5" hidden>
+    <fieldset><legend>運用</legend>
+      <div class="f"><label for="ret">運用利回り（%/年）</label><input type="number" step="0.1" id="ret"><p class="h">金融庁のシミュレーターは利回りを自分で入れる形です．全世界株式に長期で投資する場合，名目で年4〜6%を置くことが多いです．</p></div>
+      <div class="f"><label for="cashRate">現金の金利（%/年）</label><input type="number" step="0.1" id="cashRate"></div>
+    </fieldset>
+    <fieldset class="plus"><legend>積み立ての順番</legend>
+      <div class="f"><label for="emerg">先に確保する現金（生活費の何ヶ月分）</label><input type="number" id="emerg"><p class="h">生活防衛資金．会社員は生活費の3〜6ヶ月分がよく言われる目安です．</p></div>
+      <div class="f"><label for="nisaYear">NISAの年間投資額（万円）</label><input type="number" id="nisaYear"><p class="h">上限はつみたて投資枠120万円＋成長投資枠240万円で年360万円．</p></div>
+      <div class="f"><label for="nisaCap">NISAの生涯枠（万円）</label><input type="number" id="nisaCap"><p class="h">生涯の上限は1,800万円（買った金額で計算）．</p></div>
+      <div class="f"><label for="tokYear">枠が埋まった後の特定口座（万円/年）</label><input type="number" id="tokYear"></div>
+      <p class="note" style="margin:0">余ったお金は現金に回ります．足りない年は 現金→特定口座（売却益に20.315%課税）→NISA の順に取り崩します．</p>
+    </fieldset>
+    <fieldset><legend>年金</legend>
+      <div class="f"><label for="pensionAge">受給開始年齢</label><input type="number" id="pensionAge"></div>
+      <div class="f"><label for="kiso">老齢基礎年金（万円/年）</label><input type="number" step="0.1" id="kiso"><p class="h">2025年度の満額は年83.1万円（月6.9万円）．厚生年金の部分は在職中の給与から自動で計算します．</p></div>
+      <div class="f"><label for="pAdj">年金の水準（%）</label><input type="number" id="pAdj"><p class="h">2024年の財政検証では，過去30年と同じ経済が続くケースで所得代替率が61.2%から50.4%に下がります．この比（約82%）が初期値です．</p></div>
+      <div class="f"><label for="pNet">年金の手取り率（%）</label><input type="number" id="pNet"><p class="h">税と社会保険料を引いた割合．年金額によりますが85〜90%が目安です．</p></div>
+      <div class="f"><label for="endAge">何歳まで計算するか</label><input type="number" id="endAge"></div>
+    </fieldset>
+  </div>
+  <div class="nav"><button class="btn" id="prev">前のステップ</button><button class="btn reset" id="resetStep" data-label="このステップをリセット">このステップをリセット</button><button class="btn" id="next">次のステップ</button></div>
+</section>
+
+<section class="bottom">
+  <div class="card">
+    <h2>年ごとのキャッシュフロー</h2>
+    <div class="tbl"><table id="tbl"></table></div>
+    <p class="note">単位は万円．色付きの行は5年刻みの節目．「今の価値」に切り替えると，物価上昇率で2026年の金額に割り戻します．</p>
+  </div>
+  <div class="card src">
+    <h2>初期値と計算の根拠</h2>
+    <div class="tbl" style="max-height:none"><table>
+      <tr><td>年収の伸び方</td><td>厚生労働省「賃金構造基本統計調査」2025年の年齢階級別の所定内給与．企業規模は大企業1,000人以上・中企業100〜999人・小企業10〜99人．賞与や残業代も同じ割合で動くと仮定しています．</td></tr>
+      <tr><td>等級表の例</td><td>大手重工メーカーの例は，2026年4月の修士卒初任給（月30.5万円）と，等級別年収の口コミ（主任で額面1,000万円前後など）からの推定．一般的な大企業の例は，賃金構造基本統計調査の大企業・大学卒の水準に合わせた仮の値です．</td></tr>
+      <tr><td>税と社会保険</td><td>所得税（2025年改正後の基礎控除）・住民税（前年の所得に課税）・健康保険5%・厚生年金9.15%・雇用保険0.55%・介護保険0.8%（40〜64歳）で概算．退職金は退職所得控除と1/2課税．</td></tr>
+      <tr><td>贈与税</td><td>暦年贈与は基礎控除110万円と直系尊属からの特例税率．相続時精算課税は年110万円＋累計2,500万円まで非課税で，超えた分は20%．住宅取得資金の非課税枠は省エネ住宅1,000万円・一般500万円（2026年12月までの制度）．</td></tr>
+      <tr><td>生活費</td><td>総務省「家計調査」2025年．単身勤労者の消費支出（34歳以下17.92万円，35〜59歳20.57万円）と世帯人数別の消費支出（1人17.3万円・2人28.1万円・3人32.4万円・4人36.3万円）．世帯人数別の値には住居費と教育費も含まれるので，倍率はやや大きめに出ます．</td></tr>
+      <tr><td>学費</td><td>文部科学省「子供の学習費調査」2023年度の学習費総額（公立/私立）：幼稚園18.5/34.7万円，小学校33.6/182.8万円，中学校54.2/156.0万円，高校59.8/103.0万円．大学は目安．</td></tr>
+      <tr><td>退職金</td><td>厚生労働省「就労条件総合調査」2023年．大学・大学院卒（管理・事務・技術職）の定年退職者の平均1,896万円．</td></tr>
+      <tr><td>年金</td><td>老齢基礎年金は2025年度の満額．厚生年金は標準報酬（月65万円・賞与150万円/回が上限）の累計×5.481/1000．水準は2024年財政検証の過去30年投影ケース（61.2%→50.4%）．</td></tr>
+      <tr><td>住宅価格</td><td>住宅金融支援機構「フラット35利用者調査」2024年度．維持費1%は金融庁のシミュレーターと同じ扱い．</td></tr>
+      <tr><td>児童手当</td><td>2024年10月からの制度（所得制限なし，高校生年代まで）．</td></tr>
+      <tr><td>NISA</td><td>年360万円・生涯1,800万円．運用益は非課税．特定口座の売却益は20.315%．</td></tr>
+    </table></div>
+    <p class="note">制度や統計は更新されます．数字は概算で，実際の金額を保証するものではありません．</p>
+  </div>
+</section>
+</div>
+</div>
+
+<script>
+/* ===== 統計データ ===== */
+const AGES=[22,27,32,37,42,47,52,57,62,67];
+const CURVE_DATA={
+ big_all:{g:"企業規模別",n:"大企業・男女計",v:[258.4,301.7,344.6,386.3,422.0,439.3,447.6,465.9,357.7,294.6]},
+ big_m:{g:"企業規模別",n:"大企業・男性",v:[261.3,312.2,366.4,420.0,464.8,495.1,511.2,533.2,391.9,317.9]},
+ big_f:{g:"企業規模別",n:"大企業・女性",v:[255.1,287.5,306.7,316.9,339.5,340.1,332.2,335.6,288.0,252.9]},
+ mid_all:{g:"企業規模別",n:"中企業・男女計",v:[237.6,270.6,299.4,322.3,346.1,362.1,376.0,376.7,316.2,284.6]},
+ mid_m:{g:"企業規模別",n:"中企業・男性",v:[240.3,278.0,315.4,342.3,376.8,400.6,420.8,421.5,343.4,307.0]},
+ mid_f:{g:"企業規模別",n:"中企業・女性",v:[234.9,262.3,275.6,287.5,294.1,300.9,303.6,300.2,266.0,232.4]},
+ sml_all:{g:"企業規模別",n:"小企業・男女計",v:[226.3,258.2,286.5,305.3,318.9,330.0,336.6,335.1,315.7,281.0]},
+ sml_m:{g:"企業規模別",n:"小企業・男性",v:[229.0,263.6,300.4,324.6,343.3,362.1,370.6,366.1,341.8,295.9]},
+ sml_f:{g:"企業規模別",n:"小企業・女性",v:[223.2,251.3,264.0,269.2,275.2,274.8,277.8,277.4,259.0,239.9]},
+ uni_all:{g:"学歴別",n:"大学卒・男女計",v:[263.9,296.4,340.3,382.2,425.3,458.4,494.9,529.1,420.2,367.5]},
+ grad_all:{g:"学歴別",n:"大学院卒・男女計",v:[298.8,335.0,406.1,466.6,553.7,617.8,648.3,676.2,589.8,571.3]},
+ flat:{g:"その他",n:"変化なし",v:[1,1,1,1,1,1,1,1,1,1]}};
+function curve(k,a){const v=(CURVE_DATA[k]||CURVE_DATA.flat).v;if(a<=AGES[0])return v[0];for(let i=1;i<AGES.length;i++)if(a<=AGES[i])return v[i-1]+(v[i]-v[i-1])*(a-AGES[i-1])/5;return v[v.length-1]}
+const STAGES=[["kg","幼稚園",3,5],["el","小学校",6,11],["jh","中学校",12,14],["hs","高校",15,17],["un","大学",18,21]];
+const PRESETS={
+ heavy:[{name:"事技（新人）",from:1,s:30.5,e:30.5,mgr:false},{name:"事技",from:2,s:32,e:44,mgr:false},{name:"主任",from:10,s:50,e:55,mgr:false},{name:"上席主任",from:15,s:56,e:58,mgr:false},{name:"主席（課長）",from:20,s:70.8,e:75,mgr:true},{name:"主幹（部長）",from:25,s:77.8,e:77.8,mgr:true}],
+ generic:[{name:"一般職（新人）",from:1,s:28,e:28,mgr:false},{name:"一般職",from:2,s:29,e:36,mgr:false},{name:"係長・主任",from:9,s:40,e:46,mgr:false},{name:"課長",from:18,s:58,e:62,mgr:true},{name:"部長",from:26,s:70,e:72,mgr:true}]};
+const INC_TYPES={inherit:"相続（税引後）",gift:"暦年贈与",settle:"相続時精算課税",houseE:"住宅資金贈与（省エネ住宅）",houseG:"住宅資金贈与（一般）",other:"その他（手取り）"};
+const DEF={entryAge:25,entryYear:2028,retireAge:60,reemp:450,sev:1900,initAssets:0,initNisaVal:0,initNisaCost:0,initTokVal:0,initTokCost:0,
+ payMode:"grade",initIncome:560,myCurve:"grad_all",grades:PRESETS.heavy,bonusM:6,y1Summer:50,y1WinterM:2.3,otDom:25,wageG:2,
+ abroadM:0,abroadFrom:2,abroadTo:15,otAbr:80,allow:35,otherInc:0,otherTo:65,
+ incomes:[],
+ spOn:0,marryAge:32,spDiff:0,spJob:"emp",spInc:400,spCurve:"mid_all",spStart:22,spRetire:60,spSev:1000,spLeave:67,
+ kidN:0,shiokuri:90,
+ edu:{kg:{pub:18.5,pri:34.7},el:{pub:33.6,pri:182.8},jh:{pub:54.2,pri:156.0},hs:{pub:59.8,pri:103.0},un:{nat:60,lib:120,sci:150}},
+ kids:[34,37,40,42].map(b=>({born:b,kg:"pub",el:"pub",jh:"pub",hs:"pub",un:"nat",away:false})),
+ dormUntil:32,dormFee:2,rent:6,rentM:12,buyOn:0,buyAge:38,buyPrice:5000,buyDown:500,loanRate:1.5,loanYears:35,upkeep:1,
+ liv1:14.42,liv2:17.07,extra:30,hh:[1,1.62,1.87,2.10,2.10],special:0,carAge:0,carEvery:9,carCost:300,carUntil:75,infl:2,
+ events:[],
+ ret:5,cashRate:0,emerg:0,nisaYear:360,nisaCap:1800,tokYear:360,pensionAge:65,kiso:83.1,pAdj:82,pNet:88,endAge:95};
+const NUMKEYS=Object.keys(DEF).filter(k=>typeof DEF[k]==="number"&&!["spOn","buyOn","kidN"].includes(k));
+const SELKEYS=["myCurve","spCurve","spJob"];
+const STORE="lifeplan-sim-v3";
+const clone=o=>JSON.parse(JSON.stringify(o));
+function load(){try{const t=localStorage.getItem(STORE);if(t){const o=JSON.parse(t);const s=Object.assign(clone(DEF),o);s.edu=Object.assign(clone(DEF.edu),o.edu||{});return s}}catch(e){}return clone(DEF)}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(S))}catch(e){}}
+let S=load(),mode="nom",tab=1;
+
+/* ===== 税・社会保険（円） ===== */
+function kyuyoKojo(x){if(x<=1900000)return 650000;if(x<=3600000)return x*.3+80000;if(x<=6600000)return x*.2+440000;if(x<=8500000)return x*.1+1100000;return 1950000}
+function kisoIT(i){if(i<=1320000)return 950000;if(i<=3360000)return 880000;if(i<=4890000)return 680000;if(i<=6550000)return 630000;if(i<=23500000)return 580000;return 480000}
+function incomeTax(t){const b=[[1950000,.05,0],[3300000,.1,97500],[6950000,.2,427500],[9000000,.23,636000],[18000000,.33,1536000],[40000000,.4,2796000],[1e18,.45,4796000]];
+ for(const[l,r,d]of b)if(t<=l)return Math.max(0,t*r-d)*1.021;return 0}
+function socialIns(monthly,bonus,age){const hr=.05+(age>=40&&age<65?.008:0);
+ return Math.min(monthly,1390000)*hr*12+Math.min(monthly,650000)*.0915*12+monthly*.0055*12+Math.min(bonus,5730000)*hr+Math.min(bonus,3000000)*.0915+bonus*.0055}
+function empTax(salary,bonus,age){const g=salary+bonus;const si=socialIns(salary/12,bonus,age);const inc=g-kyuyoKojo(g);
+ const t=Math.max(0,inc-si-kisoIT(inc));return{si,it:incomeTax(Math.floor(t/1000)*1000),rt:g>0?Math.max(0,inc-si-430000)*.1+5000:0}}
+function retireTax(amt,years){const ded=years<=20?400000*Math.max(years,2):8000000+700000*(years-20);const t=Math.max(0,amt-ded)/2;return incomeTax(Math.floor(t/1000)*1000)+t*.1}
+function selfNet(g){const nat=17510*12,nhi=Math.min(g*.1,1060000);const inc=Math.max(0,g-650000);const t=Math.max(0,inc-nat-nhi-kisoIT(inc));
+ return g-nat-nhi-incomeTax(Math.floor(t/1000)*1000)-Math.max(0,inc-nat-nhi-430000)*.1}
+function giftTax(x){const b=x-1100000;if(b<=0)return 0;const br=[[2e6,.1,0],[4e6,.15,1e5],[6e6,.2,3e5],[1e7,.3,9e5],[1.5e7,.4,1.9e6],[3e7,.45,2.65e6],[4.5e7,.5,4.15e6],[1e18,.55,6.4e6]];
+ for(const[l,r,d]of br)if(b<=l)return b*r-d;return 0}
+
+/* ===== 給与 ===== */
+function gradeAt(y){const G=S.grades.length?S.grades:PRESETS.generic;let gi=0;G.forEach((x,i)=>{if(y>=x.from)gi=i});const g=G[gi],nx=G[gi+1];
+ const span=nx?Math.max(1,nx.from-1-g.from):1;const t=nx?Math.min(1,(y-g.from)/span):0;return{name:g.name,base:(g.s+(g.e-g.s)*t)*1e4,mgr:g.mgr}}
+/* 今の価値の額面年収（出張手当を除く）と内訳．y=年次 */
+function myPay(y,age){
+ if(S.payMode==="simple"){
+  const gross=S.initIncome*1e4*curve(S.myCurve,age)/curve(S.myCurve,S.entryAge);
+  return{grade:"",salary:gross*12/16,bonus:gross*4/16,mgr:false,simple:true}}
+ const g=gradeAt(y);const base=g.base;const hourly=base/160;
+ const bonus=y===1?(S.y1Summer*1e4+base*S.y1WinterM):base*S.bonusM;
+ return{grade:g.name,base,hourly,bonus,mgr:g.mgr,simple:false}}
+
+/* ===== 本体 ===== */
+function simulate(){
+ const r=S.ret/100,ic=S.infl/100,wg=S.wageG/100,cr=S.cashRate/100;
+ let nisaVal=S.initNisaVal*1e4,nisaCost=(S.initNisaCost||S.initNisaVal)*1e4,tokVal=S.initTokVal*1e4,tokCost=(S.initTokCost||S.initTokVal)*1e4,cash=S.initAssets*1e4,prevRT=0,pSum=0,workYears=0,spPSum=0,settleUsed=0;
+ const kids=S.kids.slice(0,S.kidN);
+ const loanP=Math.max(0,S.buyPrice-S.buyDown)*1e4,lr=S.loanRate/100/12,ln=Math.max(1,S.loanYears*12);
+ const loanAnnual=S.buyOn?(lr>0?loanP*lr/(1-Math.pow(1+lr,-ln)):loanP/ln)*12:0;
+ if(S.spOn&&S.spJob==="emp"){const a0=S.marryAge+S.spDiff;for(let a=S.spStart;a<S.spRetire;a++)spPSum+=Math.min(S.spInc*1e4*curve(S.spCurve,a)/curve(S.spCurve,a0),10800000)}
+ const rows=[];
+ for(let age=S.entryAge;age<=S.endAge;age++){
+  const y=age-S.entryAge+1,year=S.entryYear+y-1;
+  const kW=Math.pow(1+wg,year-2026),kP=Math.pow(1+ic,year-2026),fP=Math.pow(1+ic,year-2025);
+  const married=S.spOn&&age>=S.marryAge,spAge=age+S.spDiff;
+  let grade="",mos=0,taxable=0,allowance=0,myNet=0,lump=0,pension=0,spNet=0,other=0,kidAllow=0,gift=0;
+  // 本人
+  if(age<S.retireAge){
+   workYears++;const p=myPay(y,age);grade=p.grade;
+   mos=(y>=S.abroadFrom&&y<=S.abroadTo&&!p.mgr)?Math.min(12,Math.max(0,S.abroadM)):0;
+   let salary,bonus;
+   if(p.simple){salary=p.salary*kW;bonus=p.bonus*kW}
+   else{const base=p.base*kW,h=base/160;const ot=p.mgr?0:((12-mos)*S.otDom*h*1.25+mos*S.otAbr*h*1.30);salary=base*12+ot;bonus=p.bonus*kW}
+   taxable=salary+bonus;const t=empTax(salary,bonus,age);myNet=taxable-t.si-t.it-prevRT;prevRT=t.rt;
+   allowance=mos*S.allow*1e4*kW;
+   pSum+=(Math.min(salary/12,650000)*12+Math.min(bonus,3000000))/kP;
+  }else if(age<S.pensionAge){
+   grade="再雇用";const sal=S.reemp*1e4*kW;taxable=sal;const t=empTax(sal,0,age);
+   myNet=sal-t.si-t.it-prevRT;prevRT=t.rt;pSum+=Math.min(sal/12,650000)*12/kP;
+  }else{myNet=-prevRT;prevRT=0}
+  if(age===S.retireAge){const v=S.sev*1e4*kW;lump+=v-retireTax(v,workYears)}
+  if(age>=S.pensionAge)pension+=(S.kiso*1e4+pSum*.005481)*S.pAdj/100*kP*S.pNet/100;
+  if(age<=S.otherTo)other+=S.otherInc*1e4*kP;
+  // 相続・贈与
+  S.incomes.forEach(e=>{if(age<e.age||age>=e.age+Math.max(1,e.years))return;const x=(+e.amt||0)*1e4*kP;let tax=0;
+   if(e.type==="gift")tax=giftTax(x);
+   else if(e.type==="settle"){const over=Math.max(0,x-1100000);const free=Math.max(0,25000000-settleUsed);const use=Math.min(over,free);settleUsed+=use;tax=(over-use)*.2}
+   else if(e.type==="houseE"||e.type==="houseG"){const lim=(e.type==="houseE"?1e7:5e6);tax=giftTax(Math.max(0,x-lim))}
+   gift+=x-tax});
+  // 配偶者
+  if(married){
+   const a0=S.marryAge+S.spDiff;
+   if(spAge<S.spRetire&&S.spJob!=="home"){
+    let g=S.spInc*1e4*curve(S.spCurve,spAge)/curve(S.spCurve,a0)*kW;
+    if(kids.some(k=>age===k.born))g*=S.spLeave/100;
+    spNet=S.spJob==="emp"?(()=>{const t=empTax(g*.8,g*.2,spAge);return g-t.si-t.it-t.rt})():selfNet(g);
+   }
+   if(spAge===S.spRetire&&S.spJob!=="home"){const v=S.spSev*1e4*kW;lump+=v-retireTax(v,S.spRetire-S.spStart)}
+   if(spAge>=S.pensionAge)pension+=(S.kiso*1e4+(S.spJob==="emp"?spPSum*.005481:0))*S.pAdj/100*kP*S.pNet/100;
+  }
+  // こども
+  let edu=0,kidsHome=0;
+  kids.forEach((k,i)=>{const c=age-k.born;if(c<0)return;
+   if(c<=18)kidAllow+=(i>=2?30000:(c<3?15000:10000))*12;
+   const away=k.away&&k.un!=="none"&&c>=18&&c<=21;
+   if(c<=22&&!away)kidsHome++;
+   STAGES.forEach(([key,,s0,s1])=>{if(c>=s0&&c<=s1){edu+=(S.edu[key][k[key]]||0)*1e4;if(key==="un"&&away)edu+=S.shiokuri*1e4}})});
+  edu*=fP;
+  // 住居
+  let house=0;
+  if(S.buyOn&&age>=S.buyAge){if(age===S.buyAge)house+=S.buyDown*1e4;if(age<S.buyAge+S.loanYears)house+=loanAnnual;house+=S.buyPrice*1e4*S.upkeep/100}
+  else if(age<S.dormUntil&&!married)house=S.dormFee*1e4*(12-mos);
+  else house=(married?S.rentM:S.rent)*1e4*12*kP;
+  // 生活費
+  const n=1+(married?1:0)+kidsHome;const mult=S.hh[Math.min(n,5)-1]||1;
+  const living=(age<35?S.liv1:S.liv2)*(1+S.extra/100)*12*1e4*fP*mult;
+  let other2=S.special*1e4*kP;
+  if(S.carAge>0&&age>=S.carAge&&age<=S.carUntil&&(age-S.carAge)%Math.max(1,S.carEvery)===0)other2+=S.carCost*1e4*kP;
+  S.events.forEach(e=>{if(+e.age===age)other2+=(+e.amt||0)*1e4*kP});
+  const income=myNet+allowance+spNet+pension+other+kidAllow+gift;
+  const spend=living+house+edu+other2;
+  // 運用
+  nisaVal*=1+r;tokVal*=1+r;cash*=1+cr;
+  let surplus=income+lump-spend,toN=0,toT=0;
+  if(surplus>=0){
+   const need=Math.max(0,S.emerg*(living+house)/12-cash);const fill=Math.min(surplus,need);cash+=fill;surplus-=fill;
+   const room=Math.max(0,S.nisaCap*1e4-nisaCost);toN=Math.min(surplus,S.nisaYear*1e4,room);surplus-=toN;
+   if(room-toN<=0){toT=Math.min(surplus,S.tokYear*1e4);surplus-=toT}
+   cash+=surplus;nisaCost+=toN;tokCost+=toT;nisaVal+=toN*(1+r/2);tokVal+=toT*(1+r/2);
+  }else{
+   let d=-surplus;const c=Math.min(Math.max(cash,0),d);cash-=c;d-=c;
+   if(d>0&&tokVal>0){const per=1-Math.max(0,1-tokCost/tokVal)*.20315;const sell=Math.min(tokVal,d/per);tokCost*=1-sell/tokVal;tokVal-=sell;d-=sell*per}
+   if(d>0&&nisaVal>0){const sell=Math.min(nisaVal,d);nisaCost*=1-sell/nisaVal;nisaVal-=sell;d-=sell}
+   cash-=d;
+  }
+  const tokAfter=tokVal-Math.max(0,tokVal-tokCost)*.20315;
+  rows.push({age,year,y,grade,mos,gross:taxable,myNet:myNet+allowance,spNet,pension,misc:kidAllow+other+gift,lump,income,
+   living,house,edu,other:other2,spend,inv:toN+toT,nisa:nisaVal,tok:tokAfter,cash,total:nisaVal+tokAfter+cash,kP,kW});
+ }
+ return rows}
+
+/* ===== 表示 ===== */
+const $=id=>document.getElementById(id);
+const man=v=>Math.round(v/1e4);
+const fmt=v=>{const m=Math.round(v/1e4);if(Math.abs(m)>=10000)return(m/10000).toFixed(2)+"億";return m.toLocaleString("ja-JP")+"万"};
+const val=(row,k)=>mode==="real"?row[k]/row.kP:row[k];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render(){
+ const rows=simulate();
+ const at=a=>rows.find(r=>r.age===a)||rows[rows.length-1];
+ const ret=at(S.retireAge-1),p=at(S.pensionAge),last=rows[rows.length-1];
+ const broke=rows.find(r=>r.total<0);
+ const T=[
+  ["定年時の資産",fmt(val(ret,"total")),`${ret.age}歳・${ret.year}年度`],
+  broke?["資産が尽きる年齢",broke.age+"歳","どこかで支出の見直しが必要",true]:[`${last.age}歳の資産`,fmt(val(last,"total")),`${last.year}年度・最終試算`]];
+ $("tiles").innerHTML=T.map(([k,v,s,b])=>`<div class="tile"><div class="k">${k}</div><div class="v${b?" bad":""}">${v}</div><div class="s">${s}</div></div>`).join("");
+ drawStack(rows);drawLines(rows);drawMyMini(rows);drawSpMini();
+ $("note1").textContent=mode==="real"?"物価上昇率で2026年の金額に割り戻した値です．":"その年度に口座にある名目の金額です．";
+ const H=["年齢","年度","等級","出張","額面","本人手取り","配偶者","年金","手当・贈与等","支出計","生活費","住居","教育","特別","投資","NISA","特定","現金","資産合計","現金比"];
+ $("tbl").innerHTML="<thead><tr>"+H.map(h=>`<th>${h}</th>`).join("")+"</tr></thead><tbody>"+rows.map(r=>{
+  const tot=val(r,"total");const cr=tot>0?Math.round(val(r,"cash")/tot*100)+"%":"–";const c=k=>man(val(r,k));const z=k=>c(k)||"";
+  return `<tr class="${r.y%5===0||r.y===1?"mark":""}"><td>${r.age}</td><td>${r.year}</td><td style="font-family:var(--f-body)">${esc(r.grade||"–")}</td><td>${r.mos||""}</td><td>${z("gross")}</td><td>${c("myNet")}</td><td>${z("spNet")}</td><td>${z("pension")}</td><td>${z("misc")}</td><td>${c("spend")}</td><td>${c("living")}</td><td>${c("house")}</td><td>${z("edu")}</td><td>${z("other")}</td><td>${c("inv")}</td><td>${c("nisa")}</td><td>${c("tok")}</td><td class="${r.cash<0?"neg":""}">${c("cash")}</td><td class="${tot<0?"neg":""}"><b>${man(tot)}</b></td><td>${cr}</td></tr>`}).join("")+"</tbody>";
+}
+function niceStep(v){if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return(n<=1?1:n<=2?2:n<=5?5:10)*p}
+function frame(x0,x1,W,H,lo,hi,m,ticks,ageStep){
+ const iw=W-m.l-m.r,ih=H-m.t-m.b;const st=niceStep((hi-lo)/ticks),top=Math.ceil(hi/st)*st,bot=Math.floor(lo/st)*st;
+ const X=a=>m.l+(a-x0)/(x1-x0||1)*iw,Y=v=>m.t+ih-(v-bot)/((top-bot)||1)*ih;
+ let s='<g class="grid">',ax='<g class="axis">';
+ for(let v=bot;v<=top+1e-9;v+=st){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}"/>`;ax+=`<text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end">${Math.abs(v)>=10000?(v/10000)+"億":v.toLocaleString()}</text>`}
+ for(let a=Math.ceil(x0/ageStep)*ageStep;a<=x1;a+=ageStep)ax+=`<text x="${X(a)}" y="${H-6}" text-anchor="middle">${a}歳</text>`;
+ return{m,iw,ih,x0,x1,X,Y,grid:s+"</g>",axis:ax+"</g>"}}
+function retireLine(F){const ra=S.retireAge;return(ra>F.x0&&ra<F.x1)?`<line x1="${F.X(ra)}" x2="${F.X(ra)}" y1="${F.m.t}" y2="${F.m.t+F.ih}" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text x="${F.X(ra)+4}" y="${F.m.t+11}" fill="var(--ink-3)" font-size="11">定年</text>`:""}
+function hover(svgId,boxId,tipId,rows,F,W,html){
+ const svg=$(svgId),tip=$(tipId),box=$(boxId);
+ svg.insertAdjacentHTML("beforeend",`<line class="xh" y1="${F.m.t}" y2="${F.m.t+F.ih}" stroke="var(--ink-2)" visibility="hidden"/><rect x="${F.m.l}" y="${F.m.t}" width="${F.iw}" height="${F.ih}" fill="transparent" class="hit"/>`);
+ const xh=svg.querySelector(".xh"),hit=svg.querySelector(".hit");
+ const mv=ev=>{const rc=svg.getBoundingClientRect();const cx=(ev.clientX-rc.left)/rc.width*W;
+  const a=Math.min(F.x1,Math.max(F.x0,Math.round(F.x0+(cx-F.m.l)/F.iw*(F.x1-F.x0))));const r=rows.find(q=>q.age===a);if(!r)return;
+  xh.setAttribute("x1",F.X(a));xh.setAttribute("x2",F.X(a));xh.setAttribute("visibility","visible");
+  tip.innerHTML=`<b>${r.age}歳（${r.year}年度）</b>`+html(r).map(([n,v])=>`<div class="r"><span>${n}</span><span>${fmt(v)}</span></div>`).join("");
+  tip.hidden=false;const bx=box.getBoundingClientRect();let left=ev.clientX-bx.left+12;if(left+180>bx.width)left=ev.clientX-bx.left-190;tip.style.left=Math.max(0,left)+"px";tip.style.top="6px"};
+ hit.addEventListener("pointermove",mv);hit.addEventListener("pointerdown",mv);
+ hit.addEventListener("pointerleave",()=>{tip.hidden=true;xh.setAttribute("visibility","hidden")})}
+function drawStack(rows){
+ const W=760,H=300;const P=rows.map(r=>({age:r.age,a:Math.max(0,val(r,"nisa"))/1e4,b:Math.max(0,val(r,"tok"))/1e4,c:Math.max(0,val(r,"cash"))/1e4}));
+ const F=frame(rows[0].age,rows[rows.length-1].age,W,H,0,Math.max(1,...P.map(p=>p.a+p.b+p.c)),{l:52,r:12,t:12,b:26},4,5);
+ const area=(lo,hi)=>"M"+P.map(p=>`${F.X(p.age)},${F.Y(hi(p))}`).join("L")+"L"+P.slice().reverse().map(p=>`${F.X(p.age)},${F.Y(lo(p))}`).join("L")+"Z";
+ $("chart1").innerHTML=F.grid+`<path d="${area(p=>0,p=>p.a)}" fill="var(--s-nisa)" stroke="var(--panel)" stroke-width="1"/><path d="${area(p=>p.a,p=>p.a+p.b)}" fill="var(--s-tok)" stroke="var(--panel)" stroke-width="1"/><path d="${area(p=>p.a+p.b,p=>p.a+p.b+p.c)}" fill="var(--s-cash)" stroke="var(--panel)" stroke-width="1"/>`+retireLine(F)+F.axis;
+ hover("chart1","box1","tip1",rows,F,W,r=>[["NISA",val(r,"nisa")],["特定口座",val(r,"tok")],["現金",val(r,"cash")],["合計",val(r,"total")]])}
+function drawLines(rows){
+ const W=760,H=240;const I=rows.map(r=>val(r,"income")/1e4),E=rows.map(r=>val(r,"spend")/1e4);
+ const F=frame(rows[0].age,rows[rows.length-1].age,W,H,Math.min(0,...I,...E),Math.max(1,...I,...E),{l:52,r:12,t:12,b:26},4,5);
+ const pl=a=>"M"+rows.map((r,i)=>`${F.X(r.age)},${F.Y(a[i])}`).join("L");
+ $("chart2").innerHTML=F.grid+`<path d="${pl(E)}" fill="none" stroke="var(--s-exp)" stroke-width="2" stroke-linejoin="round"/><path d="${pl(I)}" fill="none" stroke="var(--s-inc)" stroke-width="2" stroke-linejoin="round"/>`+retireLine(F)+F.axis;
+ hover("chart2","box2","tip2",rows,F,W,r=>[["手取り収入",val(r,"income")],["支出",val(r,"spend")],["差額",val(r,"income")-val(r,"spend")]])}
+/* 入力欄の小さなグラフ：選んだ伸び方を太線，ほかを細線で */
+function miniChart(svgId,a0,a1,line,others,peakId){
+ const W=360,H=150,m={l:40,r:8,t:8,b:22};
+ const hi=Math.max(1,...line.map(p=>p[1]),...others.flat().map(p=>p[1]));
+ const F=frame(a0,a1,W,H,0,hi,m,3,10);
+ const pl=pts=>"M"+pts.map(([a,v])=>`${F.X(a)},${F.Y(v)}`).join("L");
+ $(svgId).innerHTML=F.grid+others.map(o=>`<path d="${pl(o)}" fill="none" stroke="var(--s-faint)" stroke-width="1"/>`).join("")+`<path d="${pl(line)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`+F.axis;
+ const pk=line.reduce((a,b)=>b[1]>a[1]?b:a,[0,0]);$(peakId).textContent=`${Math.round(pk[1]).toLocaleString()}万円（${pk[0]}歳）`}
+function drawMyMini(rows){
+ const work=rows.filter(r=>r.age<S.retireAge);if(!work.length)return;
+ const line=work.map(r=>[r.age,r.gross/r.kW/1e4]);
+ let others=[];
+ if(S.payMode==="simple"){others=Object.keys(CURVE_DATA).filter(k=>k!==S.myCurve&&k!=="flat").map(k=>work.map(r=>[r.age,S.initIncome*curve(k,r.age)/curve(k,S.entryAge)]))}
+ miniChart("myMini",S.entryAge,S.retireAge-1,line,others,"myPeak")}
+function drawSpMini(){
+ const a0=S.marryAge+S.spDiff,start=Math.max(S.spStart,a0-10),end=Math.max(start+1,S.spRetire-1);
+ const mk=k=>{const o=[];for(let a=start;a<=end;a++)o.push([a,S.spInc*curve(k,a)/curve(k,a0)]);return o};
+ miniChart("spMini",start,end,mk(S.spCurve),Object.keys(CURVE_DATA).filter(k=>k!==S.spCurve&&k!=="flat").map(mk),"spPeak")}
+
+/* ===== 入力 ===== */
+function curveOptions(sel){const groups={};Object.entries(CURVE_DATA).forEach(([k,d])=>{(groups[d.g]=groups[d.g]||[]).push(`<option value="${k}" ${k===sel?"selected":""}>${d.n}</option>`)});
+ return Object.entries(groups).map(([g,o])=>`<optgroup label="${g}">${o.join("")}</optgroup>`).join("")}
+function setRadio(name,v){document.querySelectorAll(`input[name=${name}]`).forEach(i=>i.checked=String(i.value)===String(v))}
+function syncVis(){$("spFields").classList.toggle("off",!S.spOn);$("buyFields").classList.toggle("off",!S.buyOn);
+ $("simpleBox").hidden=S.payMode!=="simple";$("gradeBox").hidden=S.payMode!=="grade"}
+function buildInputs(){
+ NUMKEYS.forEach(k=>{const el=$(k);if(el)el.value=S[k]});
+ $("myCurve").innerHTML=curveOptions(S.myCurve);$("spCurve").innerHTML=curveOptions(S.spCurve);$("spJob").value=S.spJob;$("kidN").value=S.kidN;
+ setRadio("spOn",S.spOn);setRadio("buyOn",S.buyOn);setRadio("payMode",S.payMode);syncVis();
+ drawGrades();drawHH();drawKids();drawEdu();drawEvents();drawIncs();
+}
+function drawGrades(){
+ $("grades").innerHTML='<span class="gh">等級・役職</span><span class="gh">年次〜</span><span class="gh">月給 開始</span><span class="gh">月給 終了</span><span class="gh">管理職</span>'+
+  S.grades.map((g,i)=>`<input type="text" id="gn${i}" value="${esc(g.name)}" aria-label="等級名"><input type="number" id="gf${i}" value="${g.from}" aria-label="開始年次"><input type="number" step="0.1" id="gs${i}" value="${g.s}" aria-label="月給開始（万円）"><input type="number" step="0.1" id="ge${i}" value="${g.e}" aria-label="月給終了（万円）"><input type="checkbox" id="gm${i}" ${g.mgr?"checked":""} aria-label="管理職">`).join("");
+ S.grades.forEach((g,i)=>["gn","gf","gs","ge","gm"].forEach(p=>$(p+i).addEventListener("input",()=>{g.name=$("gn"+i).value;g.from=+$("gf"+i).value;g.s=+$("gs"+i).value;g.e=+$("ge"+i).value;g.mgr=$("gm"+i).checked;changed()})))}
+function drawHH(){$("hhMult").innerHTML=["1人","2人","3人","4人以上"].map((l,i)=>`<label style="font-size:.7rem;color:var(--ink-3);display:grid;gap:2px">${l}<input type="number" step="0.01" id="hh${i}" value="${S.hh[i]}"></label>`).join("");
+ [0,1,2,3].forEach(i=>$("hh"+i).addEventListener("input",e=>{S.hh[i]=+e.target.value;if(i===3)S.hh[4]=+e.target.value;changed()}))}
+function drawKids(){
+ const opt=k=>k==="un"?[["none","進学しない"],["nat","国公立"],["lib","私立文系"],["sci","私立理系"]]:[["pub","公立"],["pri","私立"]];
+ $("kids").innerHTML=S.kids.slice(0,S.kidN).map((k,i)=>`<div class="kid"><h4>${i+1}人目</h4>
+  <div class="f"><label for="kb${i}">生まれるときのご自身の年齢</label><input type="number" id="kb${i}" value="${k.born}"><p class="h">第1子出生時の母の平均年齢は31歳前後です．</p></div>
+  <div class="school">${STAGES.map(([key,name])=>`<label>${name}<select id="k${key}${i}">${opt(key).map(([v,t])=>`<option value="${v}" ${k[key]===v?"selected":""}>${t}</option>`).join("")}</select></label>`).join("")}
+  <label>大学の住まい<select id="kaw${i}"><option value="0" ${!k.away?"selected":""}>自宅から通う</option><option value="1" ${k.away?"selected":""}>下宿する</option></select></label></div></div>`).join("");
+ S.kids.slice(0,S.kidN).forEach((k,i)=>{$("kb"+i).addEventListener("input",e=>{k.born=+e.target.value;changed()});
+  STAGES.forEach(([key])=>$("k"+key+i).addEventListener("change",e=>{k[key]=e.target.value;changed()}));
+  $("kaw"+i).addEventListener("change",e=>{k.away=e.target.value==="1";changed()})})}
+function drawEdu(){
+ const L={pub:"公立",pri:"私立",nat:"国公立",lib:"私立文系",sci:"私立理系"};
+ $("eduTbl").innerHTML=STAGES.map(([key,name])=>Object.keys(S.edu[key]).map(t=>`<div class="f"><label for="e${key}${t}">${name}・${L[t]}</label><input type="number" step="0.1" id="e${key}${t}" value="${S.edu[key][t]}"></div>`).join("")).join("");
+ STAGES.forEach(([key])=>Object.keys(S.edu[key]).forEach(t=>$("e"+key+t).addEventListener("input",e=>{S.edu[key][t]=+e.target.value;changed()})))}
+function drawEvents(){
+ $("events").innerHTML=S.events.map((e,i)=>`<div class="ev"><input type="number" id="ea${i}" value="${e.age}" aria-label="年齢"><input type="text" id="en${i}" value="${esc(e.name)}" aria-label="内容" placeholder="内容"><input type="number" id="ev${i}" value="${e.amt}" aria-label="金額（万円・今の価値）"><button class="btn x" id="ed${i}" aria-label="削除">×</button></div>`).join("")||'<p class="note" style="margin:0">結婚式や留学など，一度きりの支出を「年齢・内容・金額（万円・今の価値）」で追加できます．</p>';
+ S.events.forEach((e,i)=>{["ea","en","ev"].forEach(p=>$(p+i).addEventListener("input",()=>{e.age=+$("ea"+i).value;e.name=$("en"+i).value;e.amt=+$("ev"+i).value;changed()}));
+  $("ed"+i).addEventListener("click",()=>{S.events.splice(i,1);drawEvents();changed()})})}
+function incTaxNote(e){const x=(+e.amt||0)*1e4;const n=v=>Math.round(v/1e4).toLocaleString()+"万円";
+ if(e.type==="gift")return`贈与税 ${n(giftTax(x))}／年（110万円以下は非課税）`;
+ if(e.type==="settle")return"累計2,500万円まで非課税（毎年110万円は別枠）．のちの相続税の計算に含まれます";
+ if(e.type==="houseE")return`非課税枠1,000万円を超えた分に贈与税 ${n(giftTax(Math.max(0,x-1e7)))}`;
+ if(e.type==="houseG")return`非課税枠500万円を超えた分に贈与税 ${n(giftTax(Math.max(0,x-5e6)))}`;
+ if(e.type==="inherit")return"相続税を引いた後の受取額を入力";return"税引後の金額を入力"}
+function drawIncs(){
+ $("incs").innerHTML=S.incomes.map((e,i)=>`<div class="inc">
+  <label class="typ">種類<select id="it${i}">${Object.entries(INC_TYPES).map(([k,t])=>`<option value="${k}" ${e.type===k?"selected":""}>${t}</option>`).join("")}</select></label>
+  <button class="btn x" id="id${i}" aria-label="削除">×</button>
+  <label>開始年齢<input type="number" id="ia${i}" value="${e.age}"></label>
+  <label>何年間<input type="number" id="iy${i}" value="${e.years}"></label>
+  <label style="grid-column:span 2">金額（万円/年）<input type="number" id="iv${i}" value="${e.amt}"></label>
+  <span class="tax" id="ix${i}">${incTaxNote(e)}</span></div>`).join("")||'<p class="note" style="margin:0">親からの住宅資金の援助，毎年の贈与，相続などを追加できます．</p>';
+ S.incomes.forEach((e,i)=>{const up=()=>{e.type=$("it"+i).value;e.age=+$("ia"+i).value;e.years=Math.max(1,+$("iy"+i).value||1);e.amt=+$("iv"+i).value;$("ix"+i).textContent=incTaxNote(e);changed()};
+  ["it","ia","iy","iv"].forEach(p=>$(p+i).addEventListener("input",up));
+  $("id"+i).addEventListener("click",()=>{S.incomes.splice(i,1);drawIncs();changed()})})}
+function changed(){save();render()}
+NUMKEYS.forEach(k=>{const el=$(k);if(el)el.addEventListener("input",()=>{const v=parseFloat(el.value);if(!isNaN(v)){S[k]=v;changed()}})});
+SELKEYS.forEach(k=>$(k).addEventListener("change",e=>{S[k]=e.target.value;changed()}));
+$("kidN").addEventListener("change",e=>{S.kidN=+e.target.value;drawKids();changed()});
+document.querySelectorAll("input[name=spOn]").forEach(i=>i.addEventListener("change",()=>{S.spOn=+i.value;syncVis();changed()}));
+document.querySelectorAll("input[name=buyOn]").forEach(i=>i.addEventListener("change",()=>{S.buyOn=+i.value;syncVis();changed()}));
+document.querySelectorAll("input[name=payMode]").forEach(i=>i.addEventListener("change",()=>{S.payMode=i.value;syncVis();changed()}));
+$("gradePreset").addEventListener("change",e=>{const p=PRESETS[e.target.value];if(p){S.grades=clone(p);drawGrades();changed()}e.target.value=""});
+$("addEv").addEventListener("click",()=>{S.events.push({age:40,name:"",amt:100});drawEvents();changed()});
+$("addInc").addEventListener("click",()=>{S.incomes.push({type:"gift",age:30,years:1,amt:110});drawIncs();changed()});
+document.querySelectorAll("[data-preset]").forEach(b=>b.addEventListener("click",()=>{S.abroadM=+b.dataset.preset;$("abroadM").value=S.abroadM;changed()}));
+const STEP_KEYS={
+ 1:["entryAge","entryYear","retireAge","reemp","sev","initAssets","initNisaVal","initNisaCost","initTokVal","initTokCost","payMode","initIncome","myCurve","grades","bonusM","y1Summer","y1WinterM","otDom","wageG","abroadM","abroadFrom","abroadTo","otAbr","allow","otherInc","otherTo","incomes"],
+ 2:["spOn","marryAge","spDiff","spJob","spInc","spCurve","spStart","spRetire","spSev","spLeave"],
+ 3:["kidN","shiokuri","edu","kids"],
+ 4:["dormUntil","dormFee","rent","rentM","buyOn","buyAge","buyPrice","buyDown","loanRate","loanYears","upkeep","liv1","liv2","extra","hh","special","carAge","carEvery","carCost","carUntil","events","infl"],
+ 5:["ret","cashRate","emerg","nisaYear","nisaCap","tokYear","pensionAge","kiso","pAdj","pNet","endAge"]};
+const STEP_NAMES={1:"ご自身",2:"配偶者",3:"こども",4:"くらし",5:"運用"};
+let toastT;function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2500)}
+/* 1回目で確認表示，3秒以内の2回目で実行 */
+function armed(btn,armedLabel,run){let timer;btn.addEventListener("click",()=>{
+ if(btn.classList.contains("armed")){clearTimeout(timer);btn.classList.remove("armed");btn.textContent=btn.dataset.label;run();return}
+ btn.classList.add("armed");btn.textContent=armedLabel;timer=setTimeout(()=>{btn.classList.remove("armed");btn.textContent=btn.dataset.label},3000)})}
+armed($("resetAll"),"もう一度押すと全部消えます",()=>{S=clone(DEF);try{localStorage.removeItem(STORE)}catch(e){}buildInputs();render();toast("すべての入力を初期値に戻しました")});
+armed($("resetStep"),"もう一度押すとリセット",()=>{STEP_KEYS[tab].forEach(k=>S[k]=clone(DEF[k]));buildInputs();changed();toast(`STEP ${tab}（${STEP_NAMES[tab]}）を初期値に戻しました`)});
+function showTab(n){tab=Math.min(5,Math.max(1,n));for(let i=1;i<=5;i++){$("t"+i).setAttribute("aria-selected",String(i===tab));$("p"+i).hidden=i!==tab}
+ $("prev").disabled=tab===1;$("next").disabled=tab===5}
+/* ステップを移ったら，そのステップの入力欄の先頭（タブの位置）までスクロール */
+function toStepTop(){const smooth=!matchMedia("(prefers-reduced-motion: reduce)").matches;const beh=smooth?"smooth":"auto";
+ const box=document.querySelector(".inputs");
+ if(getComputedStyle(box).position==="sticky"&&box.scrollHeight>box.clientHeight){box.scrollTo({top:0,behavior:beh})}
+ const tabs=document.querySelector(".steps");const y=tabs.getBoundingClientRect().top+window.scrollY-8;
+ if(Math.abs(window.scrollY-y)>4&&!(getComputedStyle(box).position==="sticky"))window.scrollTo({top:y,behavior:beh});
+ const pn=$("p"+tab);pn.setAttribute("tabindex","-1");pn.focus({preventScroll:true})}
+function goStep(n){showTab(n);toStepTop()}
+for(let i=1;i<=5;i++)$("t"+i).addEventListener("click",()=>goStep(i));
+$("prev").addEventListener("click",()=>goStep(tab-1));$("next").addEventListener("click",()=>goStep(tab+1));
+$("mNom").addEventListener("click",()=>{mode="nom";$("mNom").setAttribute("aria-pressed","true");$("mReal").setAttribute("aria-pressed","false");render()});
+$("mReal").addEventListener("click",()=>{mode="real";$("mReal").setAttribute("aria-pressed","true");$("mNom").setAttribute("aria-pressed","false");render()});
+/* ===== 表示設定 ===== */
+const SER={l:{"--s-nisa":"#2a78d6","--s-tok":"#eb6834","--s-cash":"#1baf7a","--s-inc":"#6250d6","--s-exp":"#e34948"},d:{"--s-nisa":"#3987e5","--s-tok":"#d95926","--s-cash":"#199e70","--s-inc":"#9085e9","--s-exp":"#e66767"}};
+const PAL={
+ std:{n:"スチール",l:["#f3f5f6","#ffffff","#14191d","#4a545b","#6f7980","#dde2e5","#0e5e86","#f6f8f9","#c4cbd0"],d:["#121618","#1a1f22","#eef1f2","#b9c2c7","#919ba1","#2c3439","#5fb3dc","#161b1e","#3b454b"]},
+ navy:{n:"ネイビー",l:["#eef1f7","#ffffff","#121826","#454f63","#6b7488","#d8dde8","#1f4e8c","#f4f6fa","#c3cad8"],d:["#0d1320","#151d2e","#eef1f7","#b7c0d4","#8d97ad","#26304a","#7aa7ea","#111827","#33405c"]},
+ forest:{n:"フォレスト",l:["#eef3ef","#ffffff","#142019","#45564b","#6a7c70","#d7e1da","#2d6e48","#f4f8f5","#c2cfc6"],d:["#0e1511","#16201a","#ecf3ee","#b6c7bb","#8ca295","#26352c","#6cc391","#121a15","#334539"]},
+ sakura:{n:"サクラ",l:["#f8f1f3","#ffffff","#24161b","#5c4950","#82707a","#ecdde2","#a8406a","#fbf6f8","#dccbd1"],d:["#181114","#22181d","#f6eef1","#cbb8c0","#a28f98","#3a2a31","#ec8fb0","#1c1418","#4a3840"]},
+ sand:{n:"サンド",l:["#f4f1ea","#fffdf9","#221c14","#57503f","#7c7462","#e5dfd2","#8a5a22","#f8f5ef","#d3ccbd"],d:["#16130e","#201c15","#f3eee5","#c9bfae","#a0967f","#3a3326","#dba864","#1a1711","#4a4234"]},
+ mono:{n:"モノクロ",l:["#f2f2f2","#ffffff","#111111","#4a4a4a","#707070","#dddddd","#2b2b2b","#f7f7f7","#c8c8c8"],d:["#0f0f0f","#1a1a1a","#f0f0f0","#bdbdbd","#949494","#303030","#e0e0e0","#141414","#404040"]}};
+const TK=["--bg","--panel","--ink","--ink-2","--ink-3","--line","--accent","--hint-bg","--s-faint"];
+const LOOK="lifeplan-look-v1";
+let A={mode:"auto",pal:"std",bg:"",ac:""};
+try{const t=localStorage.getItem(LOOK);if(t)A=Object.assign(A,JSON.parse(t))}catch(e){}
+const hostDark=()=>{const t=document.documentElement.getAttribute("data-theme");if(t==="dark")return true;if(t==="light")return false;return matchMedia("(prefers-color-scheme: dark)").matches};
+function applyLook(){
+ const dark=A.mode==="dark"||(A.mode==="auto"&&hostDark());const v=(PAL[A.pal]||PAL.std)[dark?"d":"l"];const st=document.documentElement.style;
+ TK.forEach((k,i)=>st.setProperty(k,v[i]));Object.entries(SER[dark?"d":"l"]).forEach(([k,c])=>st.setProperty(k,c));
+ st.setProperty("--warn",dark?"#e9895a":"#b4541f");
+ if(A.bg)st.setProperty("--bg",A.bg);if(A.ac)st.setProperty("--accent",A.ac);
+ st.setProperty("--accent-soft",`color-mix(in srgb, var(--accent) ${dark?22:13}%, var(--panel))`);
+ st.setProperty("color-scheme",dark?"dark":"light");
+ document.querySelectorAll("[data-mode]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===A.mode)));
+ document.querySelectorAll("[data-pal]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.pal===A.pal)));
+ $("cBg").value=A.bg||v[0];$("cAc").value=A.ac||v[6];
+ try{localStorage.setItem(LOOK,JSON.stringify(A))}catch(e){}
+ if(typeof S!=="undefined")render()}
+$("swatches").innerHTML=Object.entries(PAL).map(([k,p])=>`<button data-pal="${k}"><i style="background:linear-gradient(135deg,${p.l[0]} 50%,${p.l[6]} 50%)"></i>${p.n}</button>`).join("");
+document.querySelectorAll("[data-pal]").forEach(b=>b.addEventListener("click",()=>{A.pal=b.dataset.pal;A.bg="";A.ac="";applyLook()}));
+document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>{A.mode=b.dataset.mode;applyLook()}));
+$("cBg").addEventListener("input",e=>{A.bg=e.target.value;applyLook()});
+$("cAc").addEventListener("input",e=>{A.ac=e.target.value;applyLook()});
+$("cClear").addEventListener("click",()=>{A.bg="";A.ac="";applyLook()});
+$("lookBtn").addEventListener("click",()=>{const o=$("look").hidden;$("look").hidden=!o;$("lookBtn").setAttribute("aria-expanded",String(o))});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{if(A.mode==="auto")applyLook()});
+new MutationObserver(()=>{if(A.mode==="auto")applyLook()}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+buildInputs();showTab(1);applyLook();
+</script>
+
+</body>
+</html>
