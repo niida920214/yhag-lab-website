@@ -776,6 +776,12 @@ section {
   .tool-columns {
     grid-template-columns: 1fr;
   }
+
+  /* 狭い画面（縦1列）では 実験ツール → 教育ツール → お遊び の順に並べ替える
+     （HTML上の順番は お遊び / 教育ツール / 実験ツール のまま） */
+  .tool-columns > .tool-column:nth-child(3) { order: 1; } /* 実験ツール */
+  .tool-columns > .tool-column:nth-child(2) { order: 2; } /* 教育ツール */
+  .tool-columns > .tool-column:nth-child(1) { order: 3; } /* お遊び */
 }
 
 /* Left column ("お遊び") default: plain elevated card */
