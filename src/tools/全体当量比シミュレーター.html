@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全体当量比シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: conditions on the left, results on the right; one column under 880px */
+  --bg:#f2f4f7; --surface:#ffffff; --soft:#eef1f5; --ink:#17202b; --muted:#5b6675; --line:#d8dde5;
+  --main:#3b5bdb;   /* 主流 */
+  --co:#c2255c;     /* 環状流 */
+  --good:#1f7a4d;   /* 希薄 */
+  --warn:#b45309;   /* 過濃 */
+  --font-body:"IBM Plex Sans JP",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f141b; --surface:#171e28; --soft:#1e2733; --ink:#e7ecf2; --muted:#9aa6b6; --line:#2b3644;
+    --main:#91a7ff; --co:#f783ac; --good:#63d08a; --warn:#f5b041;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f141b; --surface:#171e28; --soft:#1e2733; --ink:#e7ecf2; --muted:#9aa6b6; --line:#2b3644;
+  --main:#91a7ff; --co:#f783ac; --good:#63d08a; --warn:#f5b041;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 48px;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3,p{margin:0}
+h1{font-size:26px;line-height:1.3;font-weight:700;letter-spacing:.01em;text-wrap:balance}
+h2{font-size:15px;font-weight:700}
+h3{font-size:13px;font-weight:600}
+.eyebrow{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.08em}
+.lede{color:var(--muted);max-width:52em;margin-top:6px;text-wrap:pretty}
+.sym{font-family:var(--font-num);font-style:italic;white-space:nowrap}
+.sym sub,.sym sup{font-style:normal}
+sub{font-size:.72em}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
+.results{display:flex;flex-direction:column;gap:20px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:14px}
+
+/* inputs */
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;color:inherit}
+.chip{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:4px 12px;font-size:12.5px;cursor:pointer}
+.chip:hover{border-color:var(--muted)}
+.group{border:0;margin:0;padding:14px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px;min-width:0}
+.group + .group{margin-top:16px}
+.group:first-of-type{border-top:0;padding-top:0}
+legend{padding:0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;float:left;width:100%;margin-bottom:0}
+legend + *{clear:both}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot.main{background:var(--main)} .dot.co{background:var(--co)}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field > label,.field > .lab{font-size:13px;color:var(--muted)}
+.ctl{display:flex;align-items:center;gap:12px}
+.ctl input[type=range]{flex:1;min-width:0;accent-color:var(--ink);height:24px;margin:0}
+.g-main input[type=range]{accent-color:var(--main)}
+.g-co input[type=range]{accent-color:var(--co)}
+.num{display:flex;align-items:center;gap:6px;flex:none;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0 8px}
+.num:focus-within{border-color:var(--ink);outline:2px solid var(--ink);outline-offset:1px}
+.num input{width:5.2em;border:0;background:transparent;color:var(--ink);font-family:var(--font-num);font-size:15px;text-align:right;padding:6px 0;outline:none;font-variant-numeric:tabular-nums}
+.num .unit{font-size:12px;color:var(--muted);min-width:2.2em}
+.num.bad{border-color:var(--warn)}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.trio .num input{width:100%}
+.trio .num{min-width:0}
+select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:100%}
+select:focus-visible,button:focus-visible,input[type=range]:focus-visible,input[type=checkbox]:focus-visible,input[type=radio]:focus-visible + span{outline:2px solid var(--ink);outline-offset:2px}
+.check{display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--co);margin:3px 0 0;flex:none}
+.hint{font-size:12px;color:var(--muted)}
+.err{font-size:13px;color:var(--warn);font-weight:600}
+.xsec{width:100%;height:auto;display:block;max-width:380px}
+.xsec text{font-family:var(--font-body);font-size:12px;fill:var(--ink)}
+.xsec .n{font-family:var(--font-num)}
+
+/* headline result */
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.k{font-size:13px;color:var(--muted)}
+.big{font-family:var(--font-num);font-weight:600;font-size:56px;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 14px;font-size:13px;font-weight:700;border:1.5px solid currentColor;color:var(--muted)}
+.pill.lean{color:var(--good)} .pill.rich{color:var(--warn)}
+.scale{margin-top:18px}
+.track{position:relative;height:10px;border-radius:5px;background:linear-gradient(to right,color-mix(in srgb,var(--good) 26%,var(--surface)) 0 50%,color-mix(in srgb,var(--warn) 26%,var(--surface)) 50% 100%)}
+.track::after{content:"";position:absolute;left:50%;top:-5px;bottom:-5px;width:2px;background:var(--ink);transform:translateX(-1px)}
+.mk{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;border:2px solid var(--surface);transform:translate(-50%,-50%);z-index:1}
+.mk.main{background:var(--main)} .mk.co{background:var(--co)}
+.mk.total{width:15px;height:15px;border-radius:2px;background:var(--ink);transform:translate(-50%,-50%) rotate(45deg);z-index:2}
+.mk[hidden]{display:none}
+.ticks{display:flex;justify-content:space-between;font-family:var(--font-num);font-size:11.5px;color:var(--muted);margin-top:8px}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;margin-top:10px}
+.key span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.key b{font-family:var(--font-num);font-weight:500}
+.sw{width:10px;height:10px;border-radius:50%;flex:none}
+.sw.main{background:var(--main)} .sw.co{background:var(--co)} .sw.total{background:var(--ink);border-radius:1px;transform:rotate(45deg)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.facts div{min-width:0}
+.facts dt{font-size:12px;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-family:var(--font-num);font-size:17px;font-weight:500;font-variant-numeric:tabular-nums}
+.facts dd small{font-size:12px;color:var(--muted);font-weight:400}
+.actions{display:flex;align-items:center;gap:12px;margin-top:16px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--surface);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.btn:hover{opacity:.88}
+.status{font-size:12.5px;color:var(--muted)}
+
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;color:var(--muted);font-weight:400;padding-left:0}
+thead th{font-weight:600;font-size:13px}
+thead th .dot{display:inline-block;margin-right:6px;vertical-align:baseline}
+td{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+td:first-child{font-family:var(--font-body)}
+tbody tr:last-child td{border-bottom:0}
+td:last-child,th:last-child{padding-right:0}
+
+/* chart */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;padding:4px 12px;font-size:13px;border-left:1px solid var(--line)}
+.seg label:first-child span{border-left:0}
+.seg input:checked + span{background:var(--ink);color:var(--surface)}
+#chart{width:100%;min-height:220px}
+#chart svg{display:block;touch-action:pan-y}
+#chart text{font-family:var(--font-num);font-size:11.5px;fill:var(--muted)}
+#chart .ax{font-family:var(--font-body);font-size:12px}
+.readout{font-size:13px;margin-top:8px;min-height:1.65em}
+.readout b{font-family:var(--font-num);font-weight:500}
+.cross{font-size:13px;color:var(--muted)}
+.export{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.export .hint{flex:1 1 260px;margin:0}
+.export .status{flex-basis:100%}
+.export .status:empty{display:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.dash{display:inline-block;width:22px;border-top:2px dashed var(--warn);vertical-align:middle;margin-right:8px}
+
+/* notes */
+.notes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 32px}
+.notes h2{grid-column:1/-1}
+.eq{font-family:var(--font-num);font-size:14px;line-height:2;overflow-x:auto;white-space:nowrap;padding:8px 12px;background:var(--soft);border-radius:6px}
+.eq i{font-style:italic}
+.notes ul{margin:0;padding-left:1.2em;color:var(--muted);font-size:13.5px;max-width:38em}
+.notes li + li{margin-top:4px}
+
+@media (max-width:880px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .notes{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:440px){
+  .wrap{padding:20px 16px 40px}
+  .card{padding:16px}
+  .big{font-size:46px}
+  .facts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .num input{width:4.6em}
+}
+@media (prefers-reduced-motion:no-preference){
+  .mk{transition:left .15s ease-out}
+}
+</style>
+<!-- Vercel Web Analytics（Vercel配信時のみ動作。ローカルでは無害に失敗します） -->
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <p class="eyebrow">同軸二重ノズルバーナ</p>
+    <h1>全体当量比シミュレーター</h1>
+    <p class="lede">主流と環状流の流速・当量比から，バーナ全体の当量比 <span class="sym">φ<sub>total</sub></span> と各流れの燃料・空気流量を求める．</p>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="h-cond">
+      <div class="card-head">
+        <h2 id="h-cond">条件</h2>
+        <div class="presets" aria-label="条件の例">
+          <button type="button" class="chip" data-preset="rpf">例：過濃予混合パイロット</button>
+          <button type="button" class="chip" data-preset="df">例：燃料のみのパイロット</button>
+        </div>
+      </div>
+      <form id="form" novalidate>
+        <fieldset class="group">
+          <legend>燃料</legend>
+          <div class="field">
+            <select id="fuel" aria-label="燃料の種類"></select>
+            <p class="hint">主流・環状流とも同じ燃料と空気の混合気として扱う．</p>
+          </div>
+        </fieldset>
+
+        <fieldset class="group">
+          <legend>バーナ形状</legend>
+          <div class="trio">
+            <div class="field">
+              <label for="d0">主ノズル径 <span class="sym">D<sub>0</sub></span></label>
+              <span class="num"><input type="number" id="d0" min="0" step="0.1" inputmode="decimal"><span class="unit">mm</span></span>
+            </div>
+            <div class="field">
+              <label for="dco">環状ノズル径 <span class="sym">D<sub>co</sub></span></label>
+              <span class="num"><input type="number" id="dco" min="0" step="0.1" inputmode="decimal"><span class="unit">mm</span></span>
+            </div>
+            <div class="field">
+              <label for="rim">リム厚 <span class="sym">t</span></label>
+              <span class="num"><input type="number" id="rim" min="0" step="0.1" inputmode="decimal"><span class="unit">mm</span></span>
+            </div>
+          </div>
+          <p class="hint">リム厚は主ノズル出口の肉厚．ナイフエッジなら 0．</p>
+          <p class="err" id="geo-err" hidden>環状ノズル径は「主ノズル径＋リム厚×2」より大きくしてください．</p>
+          <svg class="xsec" id="xsec" viewBox="0 0 380 180" role="img" aria-label="ノズル出口の断面図"></svg>
+        </fieldset>
+
+        <fieldset class="group g-main">
+          <legend><span class="dot main"></span>主流</legend>
+          <div class="field">
+            <label for="u0">流速 <span class="sym">U<sub>0</sub></span></label>
+            <div class="ctl">
+              <input type="range" id="u0-r" min="0" max="10" step="0.1" aria-label="主流の流速">
+              <span class="num"><input type="number" id="u0" min="0" step="0.1" inputmode="decimal"><span class="unit">m/s</span></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="phi0">当量比 <span class="sym">φ<sub>0</sub></span></label>
+            <div class="ctl">
+              <input type="range" id="phi0-r" min="0" max="2" step="0.01" aria-label="主流の当量比">
+              <span class="num"><input type="number" id="phi0" min="0" step="0.01" inputmode="decimal"><span class="unit">–</span></span>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="group g-co">
+          <legend><span class="dot co"></span>環状流</legend>
+          <div class="field">
+            <label for="uco">流速 <span class="sym">U<sub>co</sub></span></label>
+            <div class="ctl">
+              <input type="range" id="uco-r" min="0" max="3" step="0.01" aria-label="環状流の流速">
+              <span class="num"><input type="number" id="uco" min="0" step="0.01" inputmode="decimal"><span class="unit">m/s</span></span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="phico">当量比 <span class="sym">φ<sub>co</sub></span></label>
+            <div class="ctl">
+              <input type="range" id="phico-r" min="0" max="5" step="0.05" aria-label="環状流の当量比">
+              <span class="num"><input type="number" id="phico" min="0" step="0.01" inputmode="decimal"><span class="unit">–</span></span>
+            </div>
+          </div>
+          <label class="check"><input type="checkbox" id="fuelonly"><span>燃料のみを流す（<span class="sym">φ<sub>co</sub></span> = ∞，拡散火炎パイロット）</span></label>
+        </fieldset>
+      </form>
+    </section>
+
+    <div class="results">
+      <section class="card" aria-labelledby="h-res">
+        <div class="hero-top">
+          <div>
+            <p class="k" id="h-res">全体当量比 <span class="sym">φ<sub>total</sub></span></p>
+            <p class="big" id="out-phi" aria-live="polite">–</p>
+          </div>
+          <span class="pill" id="out-state">–</span>
+        </div>
+        <div class="scale" aria-hidden="true">
+          <div class="track">
+            <span class="mk main" id="mk-main"></span>
+            <span class="mk co" id="mk-co"></span>
+            <span class="mk total" id="mk-total"></span>
+          </div>
+          <div class="ticks"><span>0</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0以上</span></div>
+        </div>
+        <div class="key">
+          <span><i class="sw main"></i>主流 <b id="key-main">–</b></span>
+          <span><i class="sw co"></i>環状流 <b id="key-co">–</b></span>
+          <span><i class="sw total"></i>全体 <b id="key-total">–</b></span>
+        </div>
+        <dl class="facts">
+          <div><dt>環状流の燃料分担率</dt><dd id="out-share">–</dd></div>
+          <div><dt>総流量</dt><dd id="out-q">–</dd></div>
+          <div><dt>理論空燃比（体積）</dt><dd id="out-s">–</dd></div>
+        </dl>
+        <div class="actions">
+          <button type="button" class="btn" id="copy">条件と結果をコピー</button>
+          <span class="status" id="copy-status" role="status"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-flow">
+        <div class="card-head"><h2 id="h-flow">流量の内訳</h2></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr><th></th><th><span class="dot main"></span>主流</th><th><span class="dot co"></span>環状流</th><th>合計</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-chart">
+        <div class="card-head">
+          <h2 id="h-chart">1 つの条件を変えたときの <span class="sym">φ<sub>total</sub></span></h2>
+          <div class="seg" role="radiogroup" aria-label="横軸にとる条件">
+            <label><input type="radio" name="sweep" value="uco" checked><span><span class="sym">U<sub>co</sub></span></span></label>
+            <label><input type="radio" name="sweep" value="phico"><span><span class="sym">φ<sub>co</sub></span></span></label>
+            <label><input type="radio" name="sweep" value="u0"><span><span class="sym">U<sub>0</sub></span></span></label>
+            <label><input type="radio" name="sweep" value="phi0"><span><span class="sym">φ<sub>0</sub></span></span></label>
+          </div>
+        </div>
+        <div id="chart"></div>
+        <p class="readout" id="readout"></p>
+        <p class="cross" id="cross"></p>
+        <div class="export">
+          <button type="button" class="btn" id="xlsx">Excel に書き出す</button>
+          <p class="hint" id="xlsx-hint">条件・流量の内訳と，4 つの条件（<span class="sym">U<sub>co</sub></span>，<span class="sym">φ<sub>co</sub></span>，<span class="sym">U<sub>0</sub></span>，<span class="sym">φ<sub>0</sub></span>）それぞれを変えたときの <span class="sym">φ<sub>total</sub></span> を，表とグラフ付きの .xlsx で保存する．</p>
+          <span class="status" id="xlsx-status" role="status"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card notes" aria-labelledby="h-notes">
+    <h2 id="h-notes">計算式と前提</h2>
+    <div>
+      <div class="eq">
+        <i>φ</i><sub>total</sub> = [ (<i>F</i><sub>0</sub> + <i>F</i><sub>co</sub>) / (<i>A</i><sub>0</sub> + <i>A</i><sub>co</sub>) ] / (<i>F</i>/<i>A</i>)<sub>st</sub><br>
+        <i>Q</i><sub>i</sub> = <i>U</i><sub>i</sub> <i>S</i><sub>i</sub>，　<i>S</i><sub>0</sub> = π<i>D</i><sub>0</sub>² / 4，　<i>S</i><sub>co</sub> = π [ <i>D</i><sub>co</sub>² − (<i>D</i><sub>0</sub> + 2<i>t</i>)² ] / 4<br>
+        <i>F</i><sub>i</sub> = <i>Q</i><sub>i</sub> <i>φ</i><sub>i</sub> / (<i>φ</i><sub>i</sub> + <i>s</i>)，　<i>A</i><sub>i</sub> = <i>Q</i><sub>i</sub> <i>s</i> / (<i>φ</i><sub>i</sub> + <i>s</i>)<br>
+        <i>s</i> = (<i>A</i>/<i>F</i>)<sub>st</sub> = <i>ν</i><sub>O₂</sub> / 0.21
+      </div>
+    </div>
+    <ul>
+      <li><span class="sym">F</span>，<span class="sym">A</span> は燃料・空気の体積流量，<span class="sym">s</span> は体積基準の理論空燃比，<span class="sym">ν<sub>O₂</sub></span> は燃料 1 mol の完全燃焼に必要な O₂ のモル数．</li>
+      <li>流速は出口断面の平均流速．主流と環状流は同じ温度・圧力とし，体積比＝モル比で扱う．</li>
+      <li>空気中の O₂ は 21 vol%．周囲空気の巻き込みは含めない．</li>
+      <li>流量 [L/min] は流速を定義した温度・圧力での値．マスフローコントローラの基準状態が異なる場合は換算が必要．</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+/*CALC-START*/
+const FUELS = {
+  CH4:  {name:'CH₄（メタン）',   plain:'CH4',  o2:2},
+  C2H6: {name:'C₂H₆（エタン）',  plain:'C2H6', o2:3.5},
+  C3H8: {name:'C₃H₈（プロパン）', plain:'C3H8', o2:5},
+  H2:   {name:'H₂（水素）',      plain:'H2',   o2:0.5},
+  NH3:  {name:'NH₃（アンモニア）', plain:'NH3',  o2:0.75}
+};
+const X_O2 = 0.21;
+
+// 体積流量 Q の予混合気を燃料 F と空気 A に分ける（phi = Infinity は燃料のみ）
+function split(Q, phi, s){
+  if (phi === Infinity) return {F:Q, A:0};
+  return {F:Q*phi/(phi+s), A:Q*s/(phi+s)};
+}
+
+// p: {fuel, d0, dco, t [mm], u0, uco [m/s], phi0, phico [-]}
+function calc(p){
+  const s = FUELS[p.fuel].o2 / X_O2;
+  const S0 = Math.PI/4 * p.d0*p.d0;
+  const dIn = p.d0 + 2*p.t;
+  const Sco = Math.PI/4 * (p.dco*p.dco - dIn*dIn);
+  const Q0 = p.u0*S0*0.06, Qco = p.uco*Sco*0.06;   // mm² × m/s → L/min
+  const m = split(Q0, p.phi0, s), c = split(Qco, p.phico, s);
+  const F = m.F + c.F, A = m.A + c.A;
+  const phiTotal = A > 0 ? s*F/A : (F > 0 ? Infinity : NaN);
+  return {s, S0, Sco, Q0, Qco, Q:Q0+Qco, F0:m.F, A0:m.A, Fco:c.F, Aco:c.A, F, A,
+          phiTotal, share: F > 0 ? c.F/F : NaN};
+}
+
+// グラフ・Excel の横軸範囲
+function niceAxis(raw, n){
+  const rough = raw/n, pow = Math.pow(10, Math.floor(Math.log10(rough))), f = rough/pow;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
+  return {max: Math.ceil(raw/step - 1e-9)*step, step};
+}
+function sweepRange(key, cur){
+  if (key === 'u0') return Math.max(2*cur, 2);
+  if (key === 'uco') return Math.max(2*cur, 0.1);
+  return Math.max(Number.isFinite(cur) ? 1.5*cur : 0, 2);
+}
+/*CALC-END*/
+
+/*XLSX-START*/
+// ---- 最小限の ZIP（無圧縮）----
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++){
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files){
+  const enc = new TextEncoder(), parts = [], central = [];
+  let offset = 0;
+  for (const f of files){
+    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint16(8, 0, true); lh.setUint16(10, 0, true); lh.setUint16(12, 0x21, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+    ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true); ch.setUint16(12, 0, true); ch.setUint16(14, 0x21, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+    ch.setUint16(28, name.length, true); ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const out = new Uint8Array(all.reduce((a, b) => a + b.length, 0));
+  let o = 0;
+  for (const a of all){ out.set(a, o); o += a.length; }
+  return out;
+}
+
+// ---- SpreadsheetML ----
+const xesc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function colName(i){ let s = ''; i++; while (i > 0){ const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+function cellXml(ref, c){
+  if (c === undefined || c === null) return '';
+  if (typeof c !== 'object') c = {v:c};
+  const s = c.s ? ` s="${c.s}"` : '';
+  const f = c.f ? `<f>${xesc(c.f)}</f>` : '';
+  const v = c.v;
+  if (typeof v === 'number'){
+    if (Number.isFinite(v)) return `<c r="${ref}"${s}>${f}<v>${v}</v></c>`;
+    return `<c r="${ref}"${s} t="e">${f}<v>#N/A</v></c>`;
+  }
+  if (v === undefined || v === null) return f ? `<c r="${ref}"${s}>${f}</c>` : '';
+  if (c.f) return `<c r="${ref}"${s} t="str">${f}<v>${xesc(v)}</v></c>`;
+  return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`;
+}
+const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+const NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const NS_C = 'http://schemas.openxmlformats.org/drawingml/2006/chart';
+const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+function sheetXml(rows, widths, selected, drawing){
+  let x = XML_HEAD + `<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">`;
+  x += `<sheetViews><sheetView workbookViewId="0"${selected ? ' tabSelected="1"' : ''}/></sheetViews><sheetFormatPr defaultRowHeight="18"/>`;
+  x += '<cols>' + widths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('') + '</cols><sheetData>';
+  rows.forEach((row, ri) => {
+    if (!row) return;
+    const cells = [];
+    for (let ci = 0; ci < row.length; ci++) cells.push(cellXml(colName(ci) + (ri + 1), row[ci]));
+    x += `<row r="${ri+1}">${cells.join('')}</row>`;
+  });
+  x += '</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
+  if (drawing) x += '<drawing r:id="rId1"/>';
+  return x + '</worksheet>';
+}
+const FONT = '<name val="游ゴシック"/><family val="3"/><charset val="128"/>';
+const STYLES = XML_HEAD + `<styleSheet xmlns="${NS_MAIN}">` +
+  '<numFmts count="2"><numFmt numFmtId="164" formatCode="0.000"/><numFmt numFmtId="165" formatCode="0.00"/></numFmts>' +
+  `<fonts count="4"><font><sz val="11"/>${FONT}</font><font><b/><sz val="11"/>${FONT}</font><font><b/><sz val="14"/>${FONT}</font><font><sz val="10"/><color rgb="FF666666"/>${FONT}</font></fonts>` +
+  '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF999999"/></bottom><diagonal/></border></borders>' +
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+  '<cellXfs count="8">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +                                       // 0 標準
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>' +         // 1 見出し
+    '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +               // 2 0.000
+    '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +               // 3 0.00
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                         // 4 表題
+    '<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/>' +                         // 5 入力
+    '<xf numFmtId="164" fontId="0" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFill="1"/>' + // 6 入力 0.000
+    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                         // 7 注記
+  '</cellXfs><cellStyles count="1"><cellStyle name="標準" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+// ---- グラフ（散布図，データはマーカーのみ）----
+const XL_N = 20;
+const XL_SWEEPS = [
+  {k:'uco',   sheet:'Uco変化', name:'Uco', unit:'m/s', runs:[['U','i'],['co','sub']], cell:'$B$13'},
+  {k:'phico', sheet:'φco変化', name:'φco', unit:'–',   runs:[['φ','i'],['co','sub']], cell:'$B$14'},
+  {k:'u0',    sheet:'U0変化',  name:'U0',  unit:'m/s', runs:[['U','i'],['0','sub']],  cell:'$B$11'},
+  {k:'phi0',  sheet:'φ0変化',  name:'φ0',  unit:'–',   runs:[['φ','i'],['0','sub']],  cell:'$B$12'}
+];
+const RUNS_PHIT = [['φ','i'],['total','sub']];
+function runsXml(runs, sz, bold){
+  return runs.map(([t, f]) => `<a:r><a:rPr lang="ja-JP" sz="${sz}" b="${bold ? 1 : 0}"${f === 'i' ? ' i="1"' : ''}${f === 'sub' ? ' baseline="-25000"' : ''}/><a:t>${xesc(t)}</a:t></a:r>`).join('');
+}
+function titleXml(runs, sz, bold){
+  return `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz}" b="${bold ? 1 : 0}"/></a:pPr>${runsXml(runs, sz, bold)}</a:p></c:rich></c:tx><c:overlay val="0"/></c:title>`;
+}
+function cacheXml(vals){
+  let x = `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${vals.length}"/>`;
+  vals.forEach((v, i) => { if (Number.isFinite(v)) x += `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`; });
+  return x + '</c:numCache>';
+}
+function serXml(idx, name, xref, xs, yref, ys, look){
+  return `<c:ser><c:idx val="${idx}"/><c:order val="${idx}"/><c:tx><c:v>${xesc(name)}</c:v></c:tx>${look}` +
+    `<c:xVal><c:numRef><c:f>${xesc(xref)}</c:f>${cacheXml(xs)}</c:numRef></c:xVal>` +
+    `<c:yVal><c:numRef><c:f>${xesc(yref)}</c:f>${cacheXml(ys)}</c:numRef></c:yVal><c:smooth val="0"/></c:ser>`;
+}
+function axisXml(id, cross, pos, runs, grid){
+  return `<c:valAx><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/><c:min val="0"/></c:scaling><c:delete val="0"/><c:axPos val="${pos}"/>` +
+    (grid ? '<c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>' : '') +
+    titleXml(runs, 1000, false) +
+    '<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="in"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>' +
+    '<c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="404040"/></a:solidFill></a:ln></c:spPr>' +
+    `<c:crossAx val="${cross}"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:valAx>`;
+}
+function chartXml(sw, xs, ys, cur){
+  const q = `'${sw.sheet}'!`, last = 5 + XL_N, noLine = '<a:ln><a:noFill/></a:ln>';
+  const s1 = serXml(0, 'φtotal', `${q}$A$5:$A$${last}`, xs, `${q}$H$5:$H$${last}`, ys,
+    `<c:spPr>${noLine}</c:spPr><c:marker><c:symbol val="circle"/><c:size val="6"/><c:spPr><a:solidFill><a:srgbClr val="2F4BB8"/></a:solidFill>${noLine}</c:spPr></c:marker>`);
+  const s2 = serXml(1, 'φtotal = 1（量論）', `${q}$J$5:$J$6`, [xs[0], xs[xs.length - 1]], `${q}$K$5:$K$6`, [1, 1],
+    '<c:spPr><a:ln w="15875"><a:solidFill><a:srgbClr val="B45309"/></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr><c:marker><c:symbol val="none"/></c:marker>');
+  const s3 = serXml(2, '現在の条件', `${q}$J$9`, [cur.x], `${q}$K$9`, [cur.y],
+    `<c:spPr>${noLine}</c:spPr><c:marker><c:symbol val="square"/><c:size val="9"/><c:spPr><a:solidFill><a:srgbClr val="17202B"/></a:solidFill>${noLine}</c:spPr></c:marker>`);
+  const title = [...sw.runs, [' を変えたときの ', ''], ...RUNS_PHIT];
+  const xTitle = [...sw.runs, [` [${sw.unit}]`, '']];
+  const yTitle = [...RUNS_PHIT, [' [–]', '']];
+  return XML_HEAD + `<c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R}"><c:roundedCorners val="0"/><c:chart>` +
+    titleXml(title, 1200, true) + '<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>' +
+    `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${s1}${s2}${s3}<c:axId val="500001"/><c:axId val="500002"/></c:scatterChart>` +
+    axisXml(500001, 500002, 'b', xTitle, false) + axisXml(500002, 500001, 'l', yTitle, true) +
+    '</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>' +
+    '<c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>' +
+    '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000"><a:solidFill><a:srgbClr val="262626"/></a:solidFill><a:latin typeface="Arial"/><a:ea typeface="游ゴシック"/></a:defRPr></a:pPr><a:endParaRPr lang="ja-JP"/></a:p></c:txPr></c:chartSpace>';
+}
+function drawingXml(){
+  return XML_HEAD + `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="${NS_A}">` +
+    '<xdr:twoCellAnchor><xdr:from><xdr:col>9</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>11</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
+    '<xdr:to><xdr:col>18</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>32</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
+    '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="グラフ 1"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>' +
+    '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">' +
+    `<c:chart xmlns:c="${NS_C}" xmlns:r="${NS_R}" r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+}
+function relsXml(list){
+  return XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    list.map(([id, type, target]) => `<Relationship Id="${id}" Type="${NS_R}/${type}" Target="${target}"/>`).join('') + '</Relationships>';
+}
+
+// p: 現在の条件, activeKey: 開いておくシート, cache=false で計算値を書かない（検証用）
+function buildXlsx(p, now, activeKey, cache = true){
+  const r = calc(p);
+  const V = v => cache ? v : undefined;
+  const T = (v, s) => ({v, s});
+  const C = "'条件'!";
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const phicoCell = Number.isFinite(p.phico) ? p.phico : '∞';
+
+  // 条件シート
+  const R = [];
+  const set = (n, arr) => { R[n - 1] = arr; };
+  const N3 = (f, v) => ({f, v:V(v), s:2});
+  const pct = (F, Q) => Q > 0 ? F / Q * 100 : NaN;
+  set(1, [T('全体当量比シミュレーター　計算結果', 4)]);
+  set(2, [T('書き出し日時：' + stamp, 7)]);
+  set(4, [T('項目', 1), T('値', 1), T('単位', 1), T('備考', 1)]);
+  set(5, ['燃料', FUELS[p.fuel].plain]);
+  set(6, ['必要O₂量 ν', T(FUELS[p.fuel].o2, 5), 'mol/mol', '燃料 1 mol の完全燃焼に必要な O₂ のモル数']);
+  set(7, ['理論空燃比 s（体積）', N3('B6/0.21', r.s), '–', '(A/F)st = ν / 0.21']);
+  set(8, ['主ノズル径 D0', T(p.d0, 5), 'mm']);
+  set(9, ['環状ノズル径 Dco', T(p.dco, 5), 'mm']);
+  set(10, ['リム厚 t', T(p.t, 5), 'mm', 'ナイフエッジなら 0']);
+  set(11, ['主流流速 U0', T(p.u0, 5), 'm/s']);
+  set(12, ['主流当量比 φ0', T(p.phi0, 5), '–']);
+  set(13, ['環状流流速 Uco', T(p.uco, 5), 'm/s']);
+  set(14, ['環状流当量比 φco', T(phicoCell, 5), '–', '∞ と入力すると燃料のみ（拡散火炎パイロット）']);
+  set(16, [T('流量の内訳', 1), T('主流', 1), T('環状流', 1), T('合計', 1)]);
+  set(17, ['出口断面積 S [mm²]', {f:'PI()/4*B8^2', v:V(r.S0), s:3}, {f:'PI()/4*(B9^2-(B8+2*B10)^2)', v:V(r.Sco), s:3}, {f:'B17+C17', v:V(r.S0 + r.Sco), s:3}]);
+  set(18, ['体積流量 Q [L/min]', N3('B11*B17*0.06', r.Q0), N3('B13*C17*0.06', r.Qco), N3('B18+C18', r.Q)]);
+  set(19, ['燃料流量 F [L/min]', N3('B18*B12/(B12+B7)', r.F0), N3('IF(ISNUMBER(B14),C18*B14/(B14+B7),C18)', r.Fco), N3('B19+C19', r.F)]);
+  set(20, ['空気流量 A [L/min]', N3('B18*B7/(B12+B7)', r.A0), N3('IF(ISNUMBER(B14),C18*B7/(B14+B7),0)', r.Aco), N3('B20+C20', r.A)]);
+  set(21, ['燃料濃度 χ [vol%]', N3('IF(B18>0,B19/B18*100,NA())', pct(r.F0, r.Q0)), N3('IF(C18>0,C19/C18*100,NA())', pct(r.Fco, r.Qco)), N3('IF(D18>0,D19/D18*100,NA())', pct(r.F, r.Q))]);
+  set(22, ['当量比 [–]', N3('B12', p.phi0), {f:'B14', v:V(phicoCell), s:2}, N3('IF(D20>0,B7*D19/D20,NA())', r.phiTotal)]);
+  set(24, [T('黄色のセルを書き換えると，流量の内訳と各シートの表・グラフが再計算されます．', 7)]);
+  set(25, [T('φtotal = [(F0 + Fco) / (A0 + Aco)] / (F/A)st　（F，A は燃料・空気の体積流量）', 7)]);
+  set(26, [T('流量 [L/min] は「流速 × 出口断面積」の値（温度・圧力の換算なし）．', 7)]);
+
+  const sheets = [{name:'条件', xml:sheetXml(R, [24, 12, 10, 46], !activeKey, false)}];
+  const charts = [];
+  const cellOf = {u0:'$B$11', phi0:'$B$12', uco:'$B$13', phico:'$B$14'};
+
+  for (const sw of XL_SWEEPS){
+    const S = [];
+    const put = (n, arr) => { S[n - 1] = arr; };
+    const xmax = niceAxis(sweepRange(sw.k, p[sw.k]), 5).max;
+    put(1, [T(`${sw.name} を変えたときの φtotal`, 4)]);
+    put(2, [T('ほかの条件は「条件」シートの値を参照．A列（横軸の値）も書き換えられます．', 7)]);
+    put(4, [T(`${sw.name} [${sw.unit}]`, 1), T('Q0 [L/min]', 1), T('Qco [L/min]', 1), T('F0 [L/min]', 1), T('A0 [L/min]', 1),
+            T('Fco [L/min]', 1), T('Aco [L/min]', 1), T('φtotal [–]', 1), undefined, T('量論線 x', 1), T('量論線 y', 1)]);
+    const xs = [], ys = [];
+    for (let i = 0; i <= XL_N; i++){
+      const rr = 5 + i, x = Number((xmax * i / XL_N).toPrecision(12));
+      const q = calc({...p, [sw.k]:x});
+      const ref = key => key === sw.k ? `$A${rr}` : C + cellOf[key];
+      const s = C + '$B$7', ph0 = ref('phi0'), phc = ref('phico');
+      xs.push(x); ys.push(q.phiTotal);
+      put(rr, [
+        T(x, 6),
+        N3(`${ref('u0')}*${C}$B$17*0.06`, q.Q0),
+        N3(`${ref('uco')}*${C}$C$17*0.06`, q.Qco),
+        N3(`B${rr}*${ph0}/(${ph0}+${s})`, q.F0),
+        N3(`B${rr}*${s}/(${ph0}+${s})`, q.A0),
+        N3(`IF(ISNUMBER(${phc}),C${rr}*${phc}/(${phc}+${s}),C${rr})`, q.Fco),
+        N3(`IF(ISNUMBER(${phc}),C${rr}*${s}/(${phc}+${s}),0)`, q.Aco),
+        N3(`IF((E${rr}+G${rr})>0,${s}*(D${rr}+F${rr})/(E${rr}+G${rr}),NA())`, q.phiTotal)
+      ]);
+    }
+    S[4][9] = {f:'A5', v:V(xs[0]), s:2};               S[4][10] = 1;
+    S[5][9] = {f:`A${5 + XL_N}`, v:V(xs[XL_N]), s:2};   S[5][10] = 1;
+    S[7][9] = T('現在の条件 x', 1);                      S[7][10] = T('現在の条件 φtotal', 1);
+    const curX = Number.isFinite(p[sw.k]) ? p[sw.k] : NaN;
+    S[8][9] = {f: sw.k === 'phico' ? `IF(ISNUMBER(${C}$B$14),${C}$B$14,NA())` : C + sw.cell, v:V(curX), s:2};
+    S[8][10] = {f: C + '$D$22', v:V(r.phiTotal), s:2};
+    sheets.push({name:sw.sheet, xml:sheetXml(S, [12, 11, 11, 11, 11, 11, 11, 11, 3, 13, 17], activeKey === sw.k, true)});
+    charts.push(chartXml(sw, xs, ys, {x:curX, y:r.phiTotal}));
+  }
+
+  const active = Math.max(0, XL_SWEEPS.findIndex(s => s.k === activeKey) + 1);
+  const files = [];
+  const ct = 'application/vnd.openxmlformats-officedocument.';
+  files.push({name:'[Content_Types].xml', data: XML_HEAD +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+    `<Override PartName="/xl/workbook.xml" ContentType="${ct}spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/styles.xml" ContentType="${ct}spreadsheetml.styles+xml"/>` +
+    sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="${ct}spreadsheetml.worksheet+xml"/>`).join('') +
+    charts.map((c, i) => `<Override PartName="/xl/drawings/drawing${i+1}.xml" ContentType="${ct}drawing+xml"/><Override PartName="/xl/charts/chart${i+1}.xml" ContentType="${ct}drawingml.chart+xml"/>`).join('') +
+    '</Types>'});
+  files.push({name:'_rels/.rels', data: relsXml([['rId1', 'officeDocument', 'xl/workbook.xml']])});
+  files.push({name:'xl/workbook.xml', data: XML_HEAD + `<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
+    `<bookViews><workbookView activeTab="${active}"/></bookViews><sheets>` +
+    sheets.map((s, i) => `<sheet name="${xesc(s.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('') +
+    '</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>'});
+  files.push({name:'xl/_rels/workbook.xml.rels', data: relsXml([
+    ...sheets.map((s, i) => [`rId${i+1}`, 'worksheet', `worksheets/sheet${i+1}.xml`]),
+    [`rId${sheets.length + 1}`, 'styles', 'styles.xml']])});
+  files.push({name:'xl/styles.xml', data: STYLES});
+  sheets.forEach((s, i) => files.push({name:`xl/worksheets/sheet${i+1}.xml`, data:s.xml}));
+  charts.forEach((c, i) => {
+    files.push({name:`xl/worksheets/_rels/sheet${i+2}.xml.rels`, data: relsXml([['rId1', 'drawing', `../drawings/drawing${i+1}.xml`]])});
+    files.push({name:`xl/drawings/drawing${i+1}.xml`, data: drawingXml()});
+    files.push({name:`xl/drawings/_rels/drawing${i+1}.xml.rels`, data: relsXml([['rId1', 'chart', `../charts/chart${i+1}.xml`]])});
+    files.push({name:`xl/charts/chart${i+1}.xml`, data:c});
+  });
+  return zipStore(files);
+}
+/*XLSX-END*/
+
+
+const $ = id => document.getElementById(id);
+const PAIRS = ['u0','phi0','uco','phico'];
+const NUMS = ['d0','dco','rim','u0','phi0','uco','phico'];
+const DEFAULTS = {fuel:'CH4', d0:10, dco:17, rim:0, u0:3.0, phi0:0.60, uco:1.00, phico:1.50, fuelonly:false};
+const PRESETS = {
+  rpf:{u0:3.0, phi0:0.60, uco:1.00, phico:1.50, fuelonly:false},
+  df: {u0:5.0, phi0:0.60, uco:0.03, phico:1.50, fuelonly:true}
+};
+const SWEEP = {
+  uco:  {html:'<span class="sym">U<sub>co</sub></span>', svg:['U','co'], unit:'m/s', plain:'Uco', d:2},
+  u0:   {html:'<span class="sym">U<sub>0</sub></span>',  svg:['U','0'],  unit:'m/s', plain:'U0',  d:2},
+  phico:{html:'<span class="sym">φ<sub>co</sub></span>', svg:['φ','co'], unit:'',    plain:'φco', d:2},
+  phi0: {html:'<span class="sym">φ<sub>0</sub></span>',  svg:['φ','0'],  unit:'',    plain:'φ0',  d:2}
+};
+const PHI_T = '<span class="sym">φ<sub>total</sub></span>';
+const state = {p:null, r:null, ok:false, sweep:'uco'};
+let chartCtx = null;
+
+function fmt(v, d){ return Number.isFinite(v) ? v.toFixed(d) : (v === Infinity ? '∞' : '–'); }
+function decimals(step){ return Math.max(0, -Math.floor(Math.log10(step) + 1e-9)); }
+
+function setValues(v){
+  for (const k of Object.keys(v)){
+    if (k === 'fuel') $('fuel').value = v.fuel;
+    else if (k === 'fuelonly') $('fuelonly').checked = v.fuelonly;
+    else { $(k).value = v[k]; if (PAIRS.includes(k)) $(k+'-r').value = v[k]; }
+  }
+}
+
+function read(){
+  const p = {fuel:$('fuel').value}; let ok = true;
+  for (const id of NUMS){
+    const el = $(id), v = parseFloat(el.value);
+    const skip = id === 'phico' && $('fuelonly').checked;
+    const good = skip || (Number.isFinite(v) && v >= 0);
+    el.parentElement.classList.toggle('bad', !good);
+    if (!good) ok = false;
+    p[id === 'rim' ? 't' : id] = v;
+  }
+  if ($('fuelonly').checked) p.phico = Infinity;
+  return {p, ok};
+}
+
+function update(){
+  const only = $('fuelonly').checked;
+  $('phico').disabled = only; $('phico-r').disabled = only;
+  const {p, ok} = read();
+  let geoOk = true;
+  if (ok){ geoOk = p.dco > p.d0 + 2*p.t && p.d0 > 0; }
+  $('geo-err').hidden = !ok || geoOk;
+  state.p = p; state.ok = ok && geoOk; state.r = state.ok ? calc(p) : null;
+  renderResult(); renderTable(); renderXsec(); drawChart();
+}
+
+function renderResult(){
+  const r = state.r, p = state.p, pill = $('out-state');
+  pill.className = 'pill';
+  if (!r){
+    $('out-phi').textContent = '–'; pill.textContent = '入力を確認';
+    for (const id of ['key-main','key-co','key-total','out-share','out-q','out-s']) $(id).textContent = '–';
+    for (const id of ['mk-main','mk-co','mk-total']) $(id).hidden = true;
+    return;
+  }
+  const pt = r.phiTotal;
+  $('out-phi').textContent = fmt(pt, 3);
+  if (Number.isNaN(pt)){ pill.textContent = '流量なし'; }
+  else if (Math.abs(pt - 1) < 0.005){ pill.textContent = '量論'; }
+  else if (pt < 1){ pill.textContent = '希薄'; pill.classList.add('lean'); }
+  else { pill.textContent = '過濃'; pill.classList.add('rich'); }
+  const place = (id, v, show) => {
+    const el = $(id); el.hidden = !show || Number.isNaN(v);
+    if (!el.hidden) el.style.left = (Math.min(v, 2)/2*100) + '%';
+  };
+  place('mk-main', p.phi0, r.Q0 > 0);
+  place('mk-co', p.phico, r.Qco > 0);
+  place('mk-total', pt, true);
+  $('key-main').innerHTML = 'φ<sub>0</sub> = ' + fmt(p.phi0, 2);
+  $('key-co').innerHTML = 'φ<sub>co</sub> = ' + fmt(p.phico, 2);
+  $('key-total').innerHTML = 'φ<sub>total</sub> = ' + fmt(pt, 3);
+  $('out-share').innerHTML = Number.isFinite(r.share) ? (r.share*100).toFixed(1) + ' <small>%</small>' : '–';
+  $('out-q').innerHTML = fmt(r.Q, 2) + ' <small>L/min</small>';
+  $('out-s').textContent = fmt(r.s, 2);
+}
+
+function renderTable(){
+  const r = state.r, p = state.p;
+  const row = (label, a, b, c) => `<tr><td>${label}</td><td>${a}</td><td>${b}</td><td>${c}</td></tr>`;
+  if (!r){ $('tbody').innerHTML = row('–','–','–','–'); return; }
+  const chi = (F, Q) => Q > 0 ? (F/Q*100).toFixed(2) : '–';
+  $('tbody').innerHTML =
+    row('出口断面積 [mm²]', fmt(r.S0,2), fmt(r.Sco,2), fmt(r.S0+r.Sco,2)) +
+    row('体積流量 [L/min]', fmt(r.Q0,3), fmt(r.Qco,3), fmt(r.Q,3)) +
+    row('燃料流量 [L/min]', fmt(r.F0,3), fmt(r.Fco,3), fmt(r.F,3)) +
+    row('空気流量 [L/min]', fmt(r.A0,3), fmt(r.Aco,3), fmt(r.A,3)) +
+    row('燃料濃度 χ [vol%]', chi(r.F0,r.Q0), chi(r.Fco,r.Qco), chi(r.F,r.Q)) +
+    row('当量比 [–]', fmt(p.phi0,3), fmt(p.phico,3), fmt(r.phiTotal,3));
+}
+
+function renderXsec(){
+  const svg = $('xsec'), p = state.p, r = state.r;
+  if (!r){ svg.innerHTML = ''; return; }
+  const cx = 92, cy = 90, R = 78, k = R/(p.dco/2);
+  const r0 = p.d0/2*k, rRim = (p.d0/2 + p.t)*k, rMid = (rRim + R)/2;
+  const ax = cx + rMid*Math.cos(Math.PI/5), ay = cy + rMid*Math.sin(Math.PI/5);
+  svg.innerHTML = `
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="var(--surface)"/>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="var(--co)" fill-opacity=".2" stroke="var(--co)" stroke-width="1.5"/>
+    <circle cx="${cx}" cy="${cy}" r="${rRim.toFixed(2)}" fill="var(--muted)"/>
+    <circle cx="${cx}" cy="${cy}" r="${r0.toFixed(2)}" fill="var(--surface)"/>
+    <circle cx="${cx}" cy="${cy}" r="${r0.toFixed(2)}" fill="var(--main)" fill-opacity=".2" stroke="var(--main)" stroke-width="1.5"/>
+    <path d="M${cx},${cy} L196,52 H206" fill="none" stroke="var(--main)" stroke-width="1"/>
+    <circle cx="${cx}" cy="${cy}" r="2.5" fill="var(--main)"/>
+    <text x="212" y="48">主流</text>
+    <text x="212" y="65" class="n">S<tspan dy="3" font-size="9">0</tspan><tspan dy="-3"> = ${r.S0.toFixed(2)} mm²</tspan></text>
+    <path d="M${ax.toFixed(1)},${ay.toFixed(1)} L196,132 H206" fill="none" stroke="var(--co)" stroke-width="1"/>
+    <circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="2.5" fill="var(--co)"/>
+    <text x="212" y="128">環状流</text>
+    <text x="212" y="145" class="n">S<tspan dy="3" font-size="9">co</tspan><tspan dy="-3"> = ${r.Sco.toFixed(2)} mm²</tspan></text>`;
+}
+
+
+function drawChart(){
+  const box = $('chart');
+  if (!state.ok){ box.innerHTML = ''; chartCtx = null; $('readout').textContent = ''; $('cross').textContent = ''; return; }
+  const W = Math.max(260, Math.floor(box.clientWidth)), H = Math.round(Math.min(320, Math.max(220, W*0.5)));
+  const m = {l:44, r:16, t:14, b:42};
+  const p = state.p, r = state.r, key = state.sweep, meta = SWEEP[key], cur = p[key];
+  const xs = niceAxis(sweepRange(key, cur), 5);
+  const f = x => calc({...p, [key]:x}).phiTotal;
+  const N = 240, data = [];
+  let ym = 1;
+  for (let i = 0; i <= N; i++){
+    const x = xs.max*i/N, y = f(x);
+    data.push([x, y]);
+    if (Number.isFinite(y)) ym = Math.max(ym, Math.min(y, 5));
+  }
+  if (Number.isFinite(r.phiTotal)) ym = Math.max(ym, Math.min(r.phiTotal, 5));
+  const ys = niceAxis(ym*1.12, 5);
+  const sx = x => m.l + x/xs.max*(W - m.l - m.r);
+  const sy = y => H - m.b - y/ys.max*(H - m.t - m.b);
+  const dx = decimals(xs.step), dy = decimals(ys.step);
+  let g = '';
+  for (let v = 0; v <= ys.max + 1e-9; v += ys.step){
+    g += `<line x1="${m.l}" x2="${W-m.r}" y1="${sy(v).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    g += `<text x="${m.l-8}" y="${(sy(v)+4).toFixed(1)}" text-anchor="end">${v.toFixed(dy)}</text>`;
+  }
+  for (let v = 0; v <= xs.max + 1e-9; v += xs.step){
+    g += `<line x1="${sx(v).toFixed(1)}" x2="${sx(v).toFixed(1)}" y1="${H-m.b}" y2="${H-m.b+5}" stroke="var(--muted)" stroke-width="1"/>`;
+    g += `<text x="${sx(v).toFixed(1)}" y="${H-m.b+19}" text-anchor="middle">${v.toFixed(dx)}</text>`;
+  }
+  g += `<line x1="${m.l}" x2="${W-m.r}" y1="${H-m.b}" y2="${H-m.b}" stroke="var(--muted)" stroke-width="1"/>`;
+  g += `<text class="ax" x="${(m.l + W - m.r)/2}" y="${H-5}" text-anchor="middle" fill="var(--muted)"><tspan font-style="italic">${meta.svg[0]}</tspan><tspan dy="3" font-size="9.5">${meta.svg[1]}</tspan><tspan dy="-3">${meta.unit ? ' [' + meta.unit + ']' : ' [–]'}</tspan></text>`;
+  // 量論線
+  if (1 <= ys.max){
+    g += `<line x1="${m.l}" x2="${W-m.r}" y1="${sy(1).toFixed(1)}" y2="${sy(1).toFixed(1)}" stroke="var(--warn)" stroke-width="1.25" stroke-dasharray="5 4"/>`;
+  }
+  let d = '', pen = false;
+  for (const [x, y] of data){
+    if (Number.isNaN(y)){ pen = false; continue; }
+    d += (pen ? 'L' : 'M') + sx(x).toFixed(1) + ',' + sy(Math.min(y, ys.max*1.5)).toFixed(1);
+    pen = true;
+  }
+  g += `<clipPath id="plot"><rect x="${m.l}" y="${m.t-4}" width="${W-m.l-m.r}" height="${H-m.t-m.b+4}"/></clipPath>`;
+  g += `<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="2.25" stroke-linejoin="round" clip-path="url(#plot)"/>`;
+  if (!Number.isFinite(cur) && Number.isFinite(r.phiTotal) && r.phiTotal <= ys.max){
+    g += `<line x1="${m.l}" x2="${W-m.r}" y1="${sy(r.phiTotal).toFixed(1)}" y2="${sy(r.phiTotal).toFixed(1)}" stroke="var(--co)" stroke-width="1.25" stroke-dasharray="2 4"/>`;
+    g += `<text x="${m.l+6}" y="${(sy(r.phiTotal)-6).toFixed(1)}" style="fill:var(--co)">φ<tspan dy="3" font-size="9">co</tspan><tspan dy="-3"> = ∞（現在の条件）</tspan></text>`;
+  }
+  g += `<line id="guide" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+  g += `<circle id="probe" r="4" fill="var(--surface)" stroke="var(--ink)" stroke-width="2" visibility="hidden"/>`;
+  if (Number.isFinite(cur) && Number.isFinite(r.phiTotal) && r.phiTotal <= ys.max && cur <= xs.max){
+    g += `<circle cx="${sx(cur).toFixed(1)}" cy="${sy(r.phiTotal).toFixed(1)}" r="6" fill="var(--ink)" stroke="var(--surface)" stroke-width="2.5"/>`;
+  }
+  box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${meta.plain} に対する全体当量比のグラフ">${g}</svg>`;
+  chartCtx = {W, H, m, xs, ys, sx, sy, f, meta};
+  const svg = box.firstChild;
+  svg.addEventListener('pointermove', onProbe);
+  svg.addEventListener('pointerdown', onProbe);
+  svg.addEventListener('pointerleave', resetReadout);
+  resetReadout();
+
+  // φtotal = 1 となる点（範囲内で最初の交点）
+  let cross = null;
+  for (let i = 1; i < data.length && cross === null; i++){
+    const [x1, y1] = data[i-1], [x2, y2] = data[i];
+    if (Number.isNaN(y1) || Number.isNaN(y2)) continue;
+    if ((y1 - 1)*(y2 - 1) <= 0 && y1 !== y2){
+      let lo = x1, hi = x2, glo = y1 - 1;
+      for (let j = 0; j < 40; j++){
+        const mid = (lo + hi)/2, gm = f(mid) - 1;
+        if (glo*gm <= 0) hi = mid; else { lo = mid; glo = gm; }
+      }
+      cross = (lo + hi)/2;
+    }
+  }
+  const unit = meta.unit ? ' ' + meta.unit : '';
+  $('cross').innerHTML = '<i class="dash"></i>破線は量論（' + PHI_T + ' = 1）．' + (cross === null
+    ? `この範囲（${meta.html} = 0 〜 ${xs.max.toFixed(dx)}${unit}）では ${PHI_T} = 1 に達しない．`
+    : `${PHI_T} = 1 となるのは ${meta.html} ≈ ${cross.toFixed(3)}${unit}．`);
+}
+
+function readoutHTML(x, y, lead){
+  const meta = SWEEP[state.sweep], unit = meta.unit ? ' ' + meta.unit : '';
+  return `${lead}${meta.html} = <b>${fmt(x, meta.d)}</b>${unit} のとき ${PHI_T} = <b>${fmt(y, 3)}</b>`;
+}
+function resetReadout(){
+  if (!chartCtx || !state.ok) return;
+  const cur = state.p[state.sweep];
+  $('readout').innerHTML = '● 現在の条件：' + readoutHTML(cur, state.r.phiTotal, '');
+  const g = document.getElementById('guide'), pr = document.getElementById('probe');
+  if (g) g.setAttribute('visibility', 'hidden');
+  if (pr) pr.setAttribute('visibility', 'hidden');
+}
+function onProbe(e){
+  if (!chartCtx) return;
+  const c = chartCtx, rect = e.currentTarget.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (c.W/rect.width);
+  const t = Math.min(1, Math.max(0, (px - c.m.l)/(c.W - c.m.l - c.m.r)));
+  const x = t*c.xs.max, y = c.f(x);
+  const g = document.getElementById('guide'), pr = document.getElementById('probe');
+  g.setAttribute('x1', c.sx(x)); g.setAttribute('x2', c.sx(x)); g.setAttribute('visibility', 'visible');
+  if (Number.isFinite(y) && y <= c.ys.max){
+    pr.setAttribute('cx', c.sx(x)); pr.setAttribute('cy', c.sy(y)); pr.setAttribute('visibility', 'visible');
+  } else pr.setAttribute('visibility', 'hidden');
+  $('readout').innerHTML = readoutHTML(x, y, '');
+}
+
+function summaryText(){
+  const p = state.p, r = state.r;
+  return [
+    '全体当量比シミュレーター',
+    `燃料: ${FUELS[p.fuel].plain}`,
+    `形状: D0 = ${p.d0} mm, Dco = ${p.dco} mm, リム厚 t = ${p.t} mm`,
+    `主流: U0 = ${fmt(p.u0,2)} m/s, φ0 = ${fmt(p.phi0,3)}, 燃料 ${fmt(r.F0,3)} L/min, 空気 ${fmt(r.A0,3)} L/min`,
+    `環状流: Uco = ${fmt(p.uco,2)} m/s, φco = ${fmt(p.phico,3)}, 燃料 ${fmt(r.Fco,3)} L/min, 空気 ${fmt(r.Aco,3)} L/min`,
+    `全体: φtotal = ${fmt(r.phiTotal,3)}, 総流量 ${fmt(r.Q,3)} L/min, 環状流の燃料分担率 ${Number.isFinite(r.share) ? (r.share*100).toFixed(1) : '–'} %`
+  ].join('\n');
+}
+
+// Excel 書き出し
+let dlPromise = null;
+function getDownloads(){
+  if (!dlPromise && window.claude && typeof window.claude.use === 'function'){
+    dlPromise = window.claude.use('downloads').catch(() => null);
+  }
+  return dlPromise;
+}
+function fileStamp(d){
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+async function exportXlsx(){
+  const st = $('xlsx-status'), btn = $('xlsx');
+  if (!state.ok){ st.textContent = '入力を確認してください．'; return; }
+  const now = new Date();
+  let bytes;
+  try { bytes = buildXlsx(state.p, now, state.sweep); }
+  catch (err){ st.textContent = 'ファイルを作れませんでした．入力を確認してください．'; return; }
+  const name = `全体当量比_${FUELS[state.p.fuel].plain}_${fileStamp(now)}.xlsx`;
+  const pending = getDownloads();
+  if (pending){
+    btn.disabled = true; st.textContent = '保存の確認画面を開いています…';
+    const dl = await pending;
+    btn.disabled = false;
+    if (!dl){ st.textContent = 'この表示ではファイルを保存できません．'; return; }
+    try {
+      await dl.save({filename:name, data:new Blob([bytes])});
+      st.textContent = `${name} を保存しました．`;
+    } catch (err){
+      const code = err && err.code;
+      st.textContent = code === 'declined' ? '保存をキャンセルしました．'
+        : code === 'rate_limited' ? '確認画面が開いています．閉じてからもう一度押してください．'
+        : 'この表示ではファイルを保存できません．';
+    }
+    return;
+  }
+  // 通常の Web ページとして置いた場合
+  const url = URL.createObjectURL(new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  st.textContent = `${name} をダウンロードしました．`;
+}
+
+// 初期化
+(function init(){
+  const sel = $('fuel');
+  for (const [k, v] of Object.entries(FUELS)){
+    const o = document.createElement('option'); o.value = k; o.textContent = v.name; sel.appendChild(o);
+  }
+  setValues(DEFAULTS);
+  for (const id of PAIRS){
+    const n = $(id), s = $(id+'-r');
+    n.addEventListener('input', () => { const v = parseFloat(n.value); if (Number.isFinite(v)) s.value = v; update(); });
+    s.addEventListener('input', () => { n.value = parseFloat(s.value).toFixed(decimals(parseFloat(s.step))); update(); });
+  }
+  for (const id of ['d0','dco','rim']) $(id).addEventListener('input', update);
+  $('fuel').addEventListener('change', update);
+  $('fuelonly').addEventListener('change', update);
+  $('form').addEventListener('submit', e => e.preventDefault());
+  document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { setValues(PRESETS[b.dataset.preset]); update(); }));
+  document.querySelectorAll('input[name=sweep]').forEach(rb => rb.addEventListener('change', () => { state.sweep = rb.value; drawChart(); }));
+  $('xlsx').addEventListener('click', exportXlsx);
+  setTimeout(getDownloads, 0);
+  $('copy').addEventListener('click', async () => {
+    const st = $('copy-status');
+    if (!state.ok){ st.textContent = '入力を確認してください．'; return; }
+    try { await navigator.clipboard.writeText(summaryText()); st.textContent = 'コピーしました．'; }
+    catch (err){ st.textContent = 'コピーできませんでした．ブラウザの設定を確認してください．'; }
+    setTimeout(() => { st.textContent = ''; }, 2500);
+  });
+  let lastW = 0;
+  if ('ResizeObserver' in window){
+    new ResizeObserver(() => { const w = Math.floor($('chart').clientWidth); if (w !== lastW){ lastW = w; drawChart(); } }).observe($('chart'));
+  } else window.addEventListener('resize', drawChart);
+  update();
+})();
+</script>
+</body>
+</html>
