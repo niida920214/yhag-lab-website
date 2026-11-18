@@ -817,6 +817,18 @@ section {
   gap: 0.9rem;
 }
 
+/* 全カラムの上に置く横長枠（研究室で重要なサイト用）。
+   中のボタンは横並び（狭い画面では自動で縦積みになる）。 */
+.tool-column--wide {
+  margin-bottom: 1.75rem;
+}
+
+.tool-btn-list--row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 0.9rem 1.25rem;
+}
+
 /* Base look shared by every tool button, whether it's a real <a> link or a
    placeholder <button> waiting for its destination page. Soft light-blue
    background with near-black text for maximum readability (mock-up style),
