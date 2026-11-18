@@ -787,28 +787,39 @@ section {
 /* Left column ("お遊び") default: plain elevated card */
 .tool-column {
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  /* 枠の境目をはっきりさせる：太めの枠線 ＋ 濃い影 */
+  border: 2px solid color-mix(in srgb, var(--color-text) 38%, var(--color-border));
   border-radius: var(--radius-lg);
   padding: 1.75rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.32),
+    0 3px 8px rgba(0, 0, 0, 0.22);
 }
 
 /* Middle/right columns ("教育ツール" / "実験ツール"): darker, semi-transparent
    card wrapper so the soft light-blue buttons pop against it. */
 .tool-column--dark {
-  background: rgba(9, 16, 32, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(9, 16, 32, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.55),
+    0 3px 10px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .tool-column--dark h3 {
   color: #ffffff;
 }
 
+/* 見出しの下に区切り線を入れて、枠の中も見やすく */
 .tool-column h3 {
   font-size: 1.05rem;
   margin-bottom: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
 }
 
 .tool-btn-list {
@@ -820,7 +831,9 @@ section {
 /* 全カラムの上に置く横長枠（研究室で重要なサイト用）。
    中のボタンは横並び（狭い画面では自動で縦積みになる）。 */
 .tool-column--wide {
-  margin-bottom: 1.75rem;
+  margin-bottom: 2rem;
+  /* 上の横長枠は金色の上線で他の3枠と区別 */
+  border-top: 4px solid var(--color-accent);
 }
 
 .tool-btn-list--row {
