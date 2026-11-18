@@ -665,14 +665,23 @@ section {
 }
 
 /* ---- Compact centered hero — title only, tool columns sit right below -*/
+/* トップページの背景グラデーション：ヒーローから下のツール枠まで継ぎ目なく続ける。
+   ヒーロー部分の光は上端に固定サイズで置き、下側にもごく薄い光を足している。 */
+#main-content:has(> .hero-zoo) {
+  background:
+    radial-gradient(circle 620px at 20% 130px, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent),
+    radial-gradient(circle 700px at 80% 60px, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent),
+    radial-gradient(circle 760px at 15% 55%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent),
+    radial-gradient(circle 760px at 85% 88%, color-mix(in srgb, var(--color-accent) 9%, transparent), transparent),
+    var(--color-bg);
+}
+
 .hero-zoo {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 55%),
-    radial-gradient(circle at 80% 10%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 60%),
-    var(--color-bg);
+  /* 背景のグラデーションは <main> 全体に敷いてある（下の .tool-sections まで
+     途切れず続くように）。ここでは背景を持たない。 */
   text-align: center;
   padding: clamp(2.5rem, 7vw, 4.5rem) 1.5rem clamp(1.5rem, 4vw, 2.5rem);
 }
