@@ -847,8 +847,17 @@ section {
 
 .tool-btn-list--row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  /* 1行4個が基本。狭い画面では2個→1個に落とす */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.9rem 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .tool-btn-list--row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 520px) {
+  .tool-btn-list--row { grid-template-columns: 1fr; }
 }
 
 /* Base look shared by every tool button, whether it's a real <a> link or a
