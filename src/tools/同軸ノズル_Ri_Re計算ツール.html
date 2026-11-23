@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同軸ノズル Ri・Re 計算</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a sticky readout band (Re/Ri x 2 streams) over two input cards, cyan = main flow, ember = annular flow. */
+:root {
+  --bg: #eef2f5;
+  --panel: #ffffff;
+  --ink: #14212b;
+  --muted: #587080;
+  --line: #d6dfe6;
+  --main: #0b7285;
+  --ann: #c2410c;
+  --field: #f6f9fb;
+  --lv0: #587080;
+  --lv1: #a15c07;
+  --lv2: #9d2b52;
+  --wall: #9fb0bc;
+  --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --font-display: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e161c;
+    --panel: #15212a;
+    --ink: #e5edf2;
+    --muted: #93a8b6;
+    --line: #26363f;
+    --main: #3cc0d8;
+    --ann: #fb8c4c;
+    --field: #101b22;
+    --lv0: #93a8b6;
+    --lv1: #f0b45a;
+    --lv2: #f08cb0;
+    --wall: #4a5c68;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e161c;
+  --panel: #15212a;
+  --ink: #e5edf2;
+  --muted: #93a8b6;
+  --line: #26363f;
+  --main: #3cc0d8;
+  --ann: #fb8c4c;
+  --field: #101b22;
+  --lv0: #93a8b6;
+  --lv1: #f0b45a;
+  --lv2: #f08cb0;
+  --wall: #4a5c68;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 56px; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 26px; line-height: 1.25; }
+h2 { font-size: 17px; }
+.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.sub { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.presets .lbl { color: var(--muted); font-size: 13px; }
+button {
+  font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; }
+
+/* readout band */
+.band {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 6px 18px -12px rgba(10, 30, 45, .45);
+  overflow: hidden;
+}
+.tile { padding: 12px 16px 12px; border-left: 1px solid var(--line); position: relative; min-width: 0; }
+.tile:first-child { border-left: 0; }
+.tile::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--tc); }
+.tile.m { --tc: var(--main); }
+.tile.a { --tc: var(--ann); }
+.tile .k { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.tile .k b { color: var(--tc); font-weight: 700; font-size: 13px; }
+.tile .v { font-family: var(--font-num); font-weight: 600; font-size: 30px; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile .v sup { font-size: .55em; }
+.tile .s { font-size: 12px; color: var(--muted); font-family: var(--font-num); }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500;
+  padding: 1px 9px; border-radius: 999px; margin-top: 4px;
+  color: var(--pc); background: color-mix(in srgb, var(--pc) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pc) 35%, transparent);
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pc); }
+.pill.l0 { --pc: var(--lv0); } .pill.l1 { --pc: var(--lv1); } .pill.l2 { --pc: var(--lv2); }
+
+.warns { display: flex; flex-direction: column; gap: 6px; }
+.warns:empty { display: none; }
+.warn { border: 1px solid color-mix(in srgb, var(--lv1) 45%, transparent); background: color-mix(in srgb, var(--lv1) 10%, transparent); color: var(--ink); border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card > header { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.card > header small { color: var(--muted); }
+.streams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.stream.m > header h2 { color: var(--main); }
+.stream.a > header h2 { color: var(--ann); }
+.stream { border-top: 4px solid var(--tc); }
+.stream.m { --tc: var(--main); }
+.stream.a { --tc: var(--ann); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fld > label, .fld > .lab { font-size: 13px; color: var(--muted); font-weight: 500; }
+.fld small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+input[type="number"], select {
+  font: inherit; font-family: var(--font-num); color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; width: 100%; min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+select { font-family: var(--font-body); }
+input:disabled { opacity: .55; }
+.unit { display: flex; align-items: center; gap: 8px; }
+.unit span { font-size: 13px; color: var(--muted); white-space: nowrap; font-family: var(--font-num); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--field); width: fit-content; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 6px 14px; cursor: pointer; font-size: 14px; color: var(--muted); border-left: 1px solid var(--line); }
+.seg label:first-of-type { border-left: 0; }
+.seg input:checked + label { background: var(--tc); color: #fff; }
+.seg input:focus-visible + label { outline: 2px solid var(--tc); outline-offset: -2px; }
+.stream[data-mode="premix"] .only-diff, .stream[data-mode="diff"] .only-premix { display: none; }
+.derived { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; font-family: var(--font-num); font-size: 13px; color: var(--muted); }
+.derived b { color: var(--ink); font-weight: 500; }
+
+table.res { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.res th, table.res td { text-align: left; padding: 5px 0; border-top: 1px solid var(--line); vertical-align: baseline; }
+table.res th { font-weight: 400; color: var(--muted); padding-right: 12px; }
+table.res td.n { font-family: var(--font-num); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table.res td.u { font-family: var(--font-num); color: var(--muted); font-size: 12px; padding-left: 8px; white-space: nowrap; width: 1%; }
+table.res tr.key th, table.res tr.key td { color: var(--ink); font-weight: 600; }
+table.res tr.sec th { font-family: var(--font-display); font-weight: 700; color: var(--tc); padding-top: 12px; border-top: 2px solid var(--line); font-size: 13px; }
+table.res sup { font-size: .75em; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tools .msg { font-size: 13px; color: var(--muted); }
+pre { margin: 0; padding: 12px; background: var(--field); border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-num); font-size: 12.5px; overflow-x: auto; white-space: pre; }
+details summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; }
+.notes { font-size: 14px; }
+.notes p, .notes ul { margin: 8px 0; max-width: 78ch; }
+.notes code { font-family: var(--font-num); font-size: 13px; background: var(--field); padding: 1px 6px; border-radius: 4px; }
+.notes li { margin: 4px 0; }
+
+@media (max-width: 860px) {
+  .streams { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .band { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile:nth-child(3) { border-left: 0; }
+  .tile:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .tile .v { font-size: 26px; }
+  h1 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* formulas and figures */
+.figbox { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.figbox figcaption { font-size: 13px; color: var(--muted); }
+.figscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--field); }
+.fig { display: block; width: 100%; min-width: 640px; height: auto; }
+.fig text { font-family: var(--font-body); fill: var(--ink); font-size: 13px; }
+.fig .mut { fill: var(--muted); }
+.fig .sm { font-size: 11.5px; }
+.fig .bd { font-weight: 700; }
+.fig .cm { fill: var(--main); } .fig .ca { fill: var(--ann); }
+.fig .ln { stroke: var(--ink); fill: none; stroke-width: 1.4; }
+.fig .dim { stroke: var(--muted); fill: none; stroke-width: 1; }
+.fig .grid { stroke: var(--line); stroke-width: 1; fill: none; }
+.fig .dash { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; fill: none; }
+.fig .wall { fill: var(--wall); }
+.fig .air { fill: color-mix(in srgb, var(--muted) 9%, var(--panel)); }
+.fig .fm { fill: color-mix(in srgb, var(--main) 24%, var(--panel)); }
+.fig .fa { fill: color-mix(in srgb, var(--ann) 24%, var(--panel)); }
+.fig .am { stroke: var(--main); stroke-width: 2.6; fill: none; }
+.fig .aa { stroke: var(--ann); stroke-width: 2.6; fill: none; }
+.fig .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+.fig .box.m { stroke: var(--main); } .fig .box.a { stroke: var(--ann); } .fig .box.k { stroke: var(--ink); }
+.fig .arr { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.fig .band0 { fill: color-mix(in srgb, var(--lv0) 8%, transparent); }
+.fig .band1 { fill: color-mix(in srgb, var(--lv1) 12%, transparent); }
+.fig .band2 { fill: color-mix(in srgb, var(--lv2) 12%, transparent); }
+.fig .chip0 { fill: color-mix(in srgb, var(--lv0) 18%, var(--panel)); }
+.fig .chip1 { fill: color-mix(in srgb, var(--lv1) 24%, var(--panel)); }
+.fig .chip2 { fill: color-mix(in srgb, var(--lv2) 24%, var(--panel)); }
+.fig .pm { fill: var(--main); stroke: var(--panel); stroke-width: 2; }
+.fig .pa { fill: var(--ann); stroke: var(--panel); stroke-width: 2; }
+.fig .hm { fill: var(--panel); stroke: var(--main); stroke-width: 2.4; }
+.fig .ha { fill: var(--panel); stroke: var(--ann); stroke-width: 2.4; }
+.fig .ah-m { fill: var(--main); } .fig .ah-a { fill: var(--ann); } .fig .ah-i { fill: var(--ink); } .fig .ah-u { fill: var(--muted); }
+
+.eqs { display: flex; flex-direction: column; gap: 14px; }
+.eqs h3 { font-size: 15px; margin-bottom: 6px; }
+.eq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.eq { border: 1px solid var(--line); background: var(--field); border-radius: 10px; padding: 8px 12px 6px; min-width: 0; }
+.eq .t { font-size: 12.5px; color: var(--muted); }
+.eq .t b { color: var(--ink); font-family: var(--font-num); font-weight: 500; margin-right: 4px; }
+.mw { overflow-x: auto; padding: 2px 0; }
+math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Noto Sans Math", math, serif; font-size: 1.22em; color: var(--ink); }
+math[display="block"] { margin: 6px 0; }
+.subst { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.sub-card { border: 1px solid var(--line); border-top: 4px solid var(--tc); border-radius: 10px; padding: 8px 12px; min-width: 0; background: var(--field); }
+.sub-card.m { --tc: var(--main); } .sub-card.a { --tc: var(--ann); } .sub-card.k { --tc: var(--ink); grid-column: 1 / -1; }
+.sub-card h3 { font-size: 14px; color: var(--tc); }
+.symtab { overflow-x: auto; }
+.symtab table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
+.symtab th, .symtab td { text-align: left; padding: 4px 10px 4px 0; border-top: 1px solid var(--line); vertical-align: baseline; }
+.symtab th { font-weight: 500; font-family: var(--font-num); white-space: nowrap; }
+.symtab td:last-child { color: var(--muted); font-family: var(--font-num); white-space: nowrap; }
+@media (max-width: 720px) { .subst { grid-template-columns: minmax(0, 1fr); } .sub-card.k { grid-column: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>同軸ノズル Ri・Re 計算</h1>
+    <p class="sub">主流(内管)と環状流それぞれの Re と Ri を、燃料種・予混合/拡散・当量比または濃度・流速・温度から求めます。</p>
+  </div>
+  <div class="presets" role="group" aria-label="条件の例">
+    <span class="lbl">条件の例</span>
+    <button type="button" data-preset="thesis">修論の基準条件</button>
+    <button type="button" data-preset="sotsuron">卒論の Uco=0.075</button>
+    <button type="button" data-preset="c3h8">2024卒論 C₃H₈</button>
+  </div>
+</header>
+
+<section class="band" id="band" aria-live="polite"></section>
+<div class="warns" id="warns"></div>
+
+<section class="card" id="common">
+  <header><h2>共通条件</h2><small>周囲・バーナー寸法・MFC</small></header>
+  <div class="grid">
+    <div class="fld"><label for="c_Tamb">周囲温度</label><div class="unit"><input type="number" id="c_Tamb" step="any" value="25"><span>°C</span></div></div>
+    <div class="fld"><label for="c_P">圧力</label><div class="unit"><input type="number" id="c_P" step="any" value="101.325"><span>kPa</span></div><small>ノズル出口の圧力(大気圧)です。レギュレーター二次圧は入れません。</small></div>
+    <div class="fld"><label for="c_Tstd">MFC の基準温度</label>
+      <select id="c_Tstd"><option value="0" selected>0 °C (1 atm)</option><option value="20">20 °C (1 atm)</option><option value="25">25 °C (1 atm)</option></select>
+      <small>流量入力 L/min の換算にだけ使います。</small></div>
+    <div class="fld"><span class="lab">ガス温度</span>
+      <label style="display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)"><input type="checkbox" id="c_same" checked> 周囲温度と同じ</label>
+      <small>外すと各流れの温度を別々に入力できます。</small></div>
+  </div>
+  <div class="grid">
+    <div class="fld"><label for="g_D0">主管内径 D0</label><div class="unit"><input type="number" id="g_D0" step="any" value="10"><span>mm</span></div></div>
+    <div class="fld"><label for="g_Din">内管外径</label><div class="unit"><input type="number" id="g_Din" step="any" value="10"><span>mm</span></div><small>肉厚は先行研究に記載がなく、初期値は肉厚ゼロの仮定です。実測値に直してください。</small></div>
+    <div class="fld"><label for="g_Dout">外管内径(環状流路の外径)</label><div class="unit"><input type="number" id="g_Dout" step="any" value="17"><span>mm</span></div></div>
+    <div class="fld"><label for="g_Aov">環状流路の断面積(任意)</label><div class="unit"><input type="number" id="g_Aov" step="any" placeholder="空欄で寸法から計算"><span>mm²</span></div><small>修論 p.5 は主流路の約2倍(約157 mm²)としています。</small></div>
+  </div>
+  <div class="derived" id="geo-derived"></div>
+</section>
+
+<div class="streams">
+  <article class="card stream m" id="card-m" data-mode="premix"></article>
+  <article class="card stream a" id="card-a" data-mode="diff"></article>
+</div>
+
+<section class="card" id="combined">
+  <header><h2>二つの流れの比較</h2><small>φ_total は修論 3・5 の定義</small></header>
+  <table class="res" id="comb-table"></table>
+  <div class="tools">
+    <button type="button" id="copy">結果をテキストでコピー</button>
+    <span class="msg" id="copy-msg"></span>
+  </div>
+  <details>
+    <summary>結果テキストを表示</summary>
+    <pre id="out-text"></pre>
+  </details>
+</section>
+
+<section class="card" id="mapcard">
+  <header><h2>Re と Ri の位置</h2><small>図3 · 両軸とも対数</small></header>
+  <div class="figscroll"><svg class="fig" id="map" viewBox="0 0 760 468" role="img" aria-label="Re と Ri の位置を示す図"></svg></div>
+</section>
+
+<section class="card" id="formulas">
+  <header><h2>計算式と図</h2><small>式は現在の条件の数値で代入し直します</small></header>
+
+  <figure class="figbox">
+    <div class="figscroll">
+    <svg class="fig" id="fig1" viewBox="0 0 760 340" role="img" aria-label="流路の寸法と流れを示す模式図">
+      <defs>
+        <marker id="ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah-m"/></marker>
+        <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah-a"/></marker>
+        <marker id="ahi" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah-i"/></marker>
+        <marker id="ahu" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ah-u"/></marker>
+      </defs>
+      <!-- ambient air -->
+      <rect x="20" y="58" width="400" height="132" class="air"/>
+      <text x="30" y="78" class="mut sm">周囲空気 ρ<tspan dy="3" font-size="9">air</tspan><tspan dy="-3">, </tspan><tspan>T, P</tspan></text>
+      <!-- tubes (schematic, not to scale) -->
+      <rect x="130" y="190" width="10" height="135" class="wall"/>
+      <rect x="320" y="190" width="10" height="135" class="wall"/>
+      <rect x="176" y="190" width="12" height="135" class="wall"/>
+      <rect x="272" y="190" width="12" height="135" class="wall"/>
+      <rect x="140" y="190" width="36" height="135" class="fa"/>
+      <rect x="284" y="190" width="36" height="135" class="fa"/>
+      <rect x="188" y="190" width="84" height="135" class="fm"/>
+      <!-- flows -->
+      <path d="M230 305V212" class="am" marker-end="url(#ahm)"/>
+      <path d="M158 305V214" class="aa" marker-end="url(#aha)"/>
+      <path d="M302 305V214" class="aa" marker-end="url(#aha)"/>
+      <path d="M272 255H340" class="dim"/><text x="346" y="259" class="cm bd">主流</text><text x="384" y="259">U<tspan dy="3" font-size="9">0</tspan><tspan dy="-3">, ρ</tspan><tspan dy="3" font-size="9">0</tspan></text>
+      <path d="M302 292H340" class="dim"/><text x="346" y="296" class="ca bd">環状流</text><text x="396" y="296">U<tspan dy="3" font-size="9">co</tspan><tspan dy="-3">, ρ</tspan><tspan dy="3" font-size="9">co</tspan></text>
+      <!-- dimensions -->
+      <path d="M140 190V96M320 190V96" class="dim"/>
+      <path d="M142 104H318" class="ln" marker-start="url(#ahi)" marker-end="url(#ahi)"/>
+      <text x="230" y="97" text-anchor="middle" id="f1_dout">D<tspan dy="3" font-size="9">out</tspan><tspan dy="-3"> = 17 mm</tspan></text>
+      <path d="M176 190V124M284 190V124" class="dim"/>
+      <path d="M178 132H282" class="ln" marker-start="url(#ahi)" marker-end="url(#ahi)"/>
+      <text x="230" y="125" text-anchor="middle" id="f1_din">D<tspan dy="3" font-size="9">in</tspan><tspan dy="-3"> = 10 mm</tspan></text>
+      <path d="M188 190V152M272 190V152" class="dim"/>
+      <path d="M190 160H270" class="ln" marker-start="url(#ahi)" marker-end="url(#ahi)"/>
+      <text x="230" y="153" text-anchor="middle" id="f1_d0">D<tspan dy="3" font-size="9">0</tspan><tspan dy="-3"> = 10 mm</tspan></text>
+      <path d="M142 201H174" class="ln" marker-start="url(#ahi)" marker-end="url(#ahi)"/>
+      <text x="124" y="205" text-anchor="end" id="f1_dh">D<tspan dy="3" font-size="9">h</tspan><tspan dy="-3"> = 7 mm</tspan></text>
+      <!-- gravity -->
+      <path d="M62 84V150" class="ln" marker-end="url(#ahi)"/><text x="72" y="120" class="bd">g</text>
+      <text x="30" y="318" class="mut sm">模式図(縮尺なし)</text>
+      <!-- buoyancy note -->
+      <text x="342" y="84" class="bd sm">浮力の向き</text>
+      <text x="342" y="104" class="sm">ρ<tspan dy="3" font-size="8">j</tspan><tspan dy="-3"> &lt; ρ</tspan><tspan dy="3" font-size="8">ref</tspan><tspan dy="-3">: 上向き(Ri &gt; 0)</tspan></text>
+      <text x="342" y="124" class="sm">ρ<tspan dy="3" font-size="8">j</tspan><tspan dy="-3"> &gt; ρ</tspan><tspan dy="3" font-size="8">ref</tspan><tspan dy="-3">: 下向き(Ri &lt; 0)</tspan></text>
+      <!-- top view -->
+      <text x="620" y="56" text-anchor="middle" class="bd sm">断面(上から)</text>
+      <circle cx="620" cy="188" r="102" class="wall"/>
+      <circle cx="620" cy="188" r="92" class="fa"/>
+      <circle cx="620" cy="188" r="64" class="wall"/>
+      <circle cx="620" cy="188" r="52" class="fm"/>
+      <text x="620" y="193" text-anchor="middle" class="cm bd">A<tspan dy="3" font-size="9">0</tspan></text>
+      <text x="620" y="116" text-anchor="middle" class="ca bd">A<tspan dy="3" font-size="9">a</tspan></text>
+      <text x="620" y="312" text-anchor="middle" class="sm" id="f1_A0">A0 = 78.5 mm²</text>
+      <text x="620" y="330" text-anchor="middle" class="sm" id="f1_Aa">Aa = 148 mm²</text>
+    </svg>
+    </div>
+    <figcaption>図1 流路の寸法・流れ・基準密度の関係。主流は内管の内側、環状流は内管と外管のすき間を流れます。</figcaption>
+  </figure>
+
+  <figure class="figbox">
+    <div class="figscroll">
+    <svg class="fig" id="fig2" viewBox="0 0 760 210" role="img" aria-label="計算の流れ">
+      <defs>
+        <marker id="ahf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah-u"/></marker>
+      </defs>
+      <g>
+        <rect x="8" y="30" width="128" height="86" rx="8" class="box k"/>
+        <text x="72" y="52" text-anchor="middle" class="bd">入力</text>
+        <text x="72" y="72" text-anchor="middle" class="sm">燃料種 · φ または χ</text>
+        <text x="72" y="88" text-anchor="middle" class="sm">U または Q · T · P</text>
+        <text x="72" y="104" text-anchor="middle" class="sm">D0 · Din · Dout</text>
+
+        <rect x="162" y="30" width="128" height="86" rx="8" class="box"/>
+        <text x="226" y="52" text-anchor="middle" class="bd">組成</text>
+        <text x="226" y="74" text-anchor="middle" class="sm">燃料のモル分率 x<tspan dy="3" font-size="8.5">f</tspan></text>
+        <text x="226" y="96" text-anchor="middle" class="sm">モル質量 M</text>
+
+        <rect x="316" y="30" width="128" height="86" rx="8" class="box"/>
+        <text x="380" y="52" text-anchor="middle" class="bd">物性</text>
+        <text x="380" y="74" text-anchor="middle" class="sm">密度 ρ</text>
+        <text x="380" y="90" text-anchor="middle" class="sm">粘度 μ</text>
+        <text x="380" y="106" text-anchor="middle" class="sm">動粘度 ν = μ / ρ</text>
+
+        <rect x="470" y="30" width="128" height="86" rx="8" class="box"/>
+        <text x="534" y="52" text-anchor="middle" class="bd">流れ</text>
+        <text x="534" y="72" text-anchor="middle" class="sm">U = Q / A</text>
+        <text x="534" y="88" text-anchor="middle" class="sm">燃料のみの流量</text>
+        <text x="534" y="104" text-anchor="middle" class="sm">U<tspan dy="3" font-size="8.5">eq</tspan><tspan dy="-3"> = x</tspan><tspan dy="3" font-size="8.5">f</tspan><tspan dy="-3"> U</tspan></text>
+
+        <rect x="624" y="30" width="128" height="86" rx="8" class="box m"/>
+        <text x="688" y="52" text-anchor="middle" class="bd">無次元数</text>
+        <text x="688" y="72" text-anchor="middle" class="sm">Re = U L / ν</text>
+        <text x="688" y="88" text-anchor="middle" class="sm">Ri · Fr · St</text>
+        <text x="688" y="104" text-anchor="middle" class="sm">φ<tspan dy="3" font-size="8.5">total</tspan></text>
+
+        <path d="M136 73H160" class="arr" marker-end="url(#ahf)"/><path d="M290 73H314" class="arr" marker-end="url(#ahf)"/><path d="M444 73H468" class="arr" marker-end="url(#ahf)"/><path d="M598 73H622" class="arr" marker-end="url(#ahf)"/>
+        <!-- side inputs -->
+        <rect x="470" y="144" width="150" height="46" rx="8" class="box"/>
+        <text x="545" y="164" text-anchor="middle" class="sm">基準密度 ρ<tspan dy="3" font-size="8">ref</tspan><tspan dy="-3"> (空気 または 他方の流れ)</tspan></text>
+        <text x="545" y="180" text-anchor="middle" class="sm mut">火炎温度 T<tspan dy="3" font-size="8">f</tspan><tspan dy="-3"> (任意)</tspan></text>
+        <path d="M590 144L640 120" class="arr" marker-end="url(#ahf)"/>
+        <rect x="226" y="144" width="150" height="46" rx="8" class="box"/>
+        <text x="301" y="164" text-anchor="middle" class="sm">流路断面積 A · 代表長さ L</text>
+        <text x="301" y="180" text-anchor="middle" class="sm mut">周波数 f (任意)</text>
+        <path d="M376 160L470 116" class="arr" marker-end="url(#ahf)"/>
+      </g>
+    </svg>
+    </div>
+    <figcaption>図2 入力から Re・Ri までの計算の流れ。</figcaption>
+  </figure>
+
+  <div class="eqs" id="eqs"></div>
+  <div class="symtab" id="symtab"></div>
+
+  <div class="eqs">
+    <h3>現在の条件での代入</h3>
+    <div class="subst" id="subst"></div>
+  </div>
+</section>
+
+<section class="card notes">
+  <details>
+    <summary>前提と精度</summary>
+    <ul>
+      <li>密度は理想気体です。25 °C・1 atm で CoolProp と比べた差は、CH₄ で約 0.2%、C₃H₈ で約 1.6%、C₄H₁₀ で約 3% です。</li>
+      <li>粘度は Sutherland 式、混合は Wilke 則です。純ガスは CoolProp 比で概ね 2% 以内です。C₂H₄ は CoolProp に粘度モデルがないため、文献値から約 3% の幅を見てください。混合ガスは CoolProp と比べて、CH₄/空気で 1% 以内、CH₄ や C₃H₈ を N₂・Ar で薄めた場合に 4〜6% 違いました。H₂ を含む混合は 13〜35% 違い、Wilke 則は軽いガスと重いガスの混合が苦手なうえ CoolProp の混合粘度も近似なので、H₂ 混合の Re は目安として扱ってください。</li>
+      <li>空気は O₂ 20.946% を含む乾燥空気(M = 28.96 g/mol)として扱い、(F/A)<sub>st</sub> もこの組成で計算します。</li>
+      <li>圧力はノズル出口の圧力(ほぼ大気圧)です。ガスは出口で大気圧まで膨張するので、レギュレーター二次圧は密度・粘度・流速に入りません。MFC は質量流量を測るため、流量の換算にも影響しません。MFC を校正した気体と違う気体を流すときは、ガス換算係数で読みを直してから流量を入力してください。ロータメーターなど体積式の流量計の読みは、その流量計の校正圧力に合わせた換算が別に要ります。</li>
+      <li>火炎温度を使った密度は、モル質量が変わらないとした近似です。断熱火炎温度は Cantera や CEA の値を入れてください。</li>
+      <li>図3の境界は目安です。Re は 2300 と 4000(管内流の慣例値、噴流の遷移は Re≈3100 付近とする文献もあります)、|Ri| は 0.1 と 1 で区切っています。</li>
+      <li>環状流の代表長さは、水力直径・外管内径・主管内径・任意値から選べます。卒論の環状流 Re=48 (Uco=0.075 m/s) は、主管内径 10 mm と主流混合気(φ=0.6)の動粘度 1.56×10⁻⁵ m²/s で計算すると 48.0 になります。環状流の CH₄ 自身の動粘度 1.70×10⁻⁵ m²/s を使うと 44、さらに水力直径 7 mm では 31 です。</li>
+    </ul>
+  </details>
+</section>
+
+</div>
+
+<script>
+"use strict";
+/* ---------- data ---------- */
+const R_GAS = 8.314462618;
+const O2_AIR = 0.20946;
+const G_ACC = 9.80665;
+// M [g/mol], Sutherland: mu0 [Pa s] at T0 [K], S [K]; C,H for fuels
+const SP = {
+  CH4:  { name: "メタン CH₄",     M: 16.043, mu0: 1.03e-5,  T0: 273.15, S: 198,  C: 1, H: 4 },
+  C2H6: { name: "エタン C₂H₆",    M: 30.070, mu0: 8.6e-6,   T0: 273.15, S: 287,  C: 2, H: 6 },
+  C3H8: { name: "プロパン C₃H₈",  M: 44.097, mu0: 7.5e-6,   T0: 273.15, S: 278,  C: 3, H: 8 },
+  C2H4: { name: "エチレン C₂H₄",  M: 28.054, mu0: 9.5e-6,   T0: 273.15, S: 225,  C: 2, H: 4 },
+  C4H10:{ name: "n-ブタン C₄H₁₀", M: 58.123, mu0: 6.77e-6,  T0: 273.15, S: 377,  C: 4, H: 10 },
+  H2:   { name: "水素 H₂",         M: 2.016,  mu0: 8.76e-6,  T0: 293.85, S: 72,   C: 0, H: 2 },
+  N2:   { name: "窒素 N₂",         M: 28.014, mu0: 1.663e-5, T0: 273.15, S: 107 },
+  Ar:   { name: "アルゴン Ar",     M: 39.948, mu0: 2.125e-5, T0: 273.15, S: 144 },
+  CO2:  { name: "二酸化炭素 CO₂",  M: 44.010, mu0: 1.48e-5,  T0: 293.15, S: 240 },
+  He:   { name: "ヘリウム He",     M: 4.0026, mu0: 1.87e-5,  T0: 273.15, S: 79.4 },
+  air:  { name: "空気",            M: 28.96,  mu0: 1.716e-5, T0: 273.15, S: 110.4 }
+};
+const FUELS = ["CH4", "C2H6", "C3H8", "C2H4", "C4H10", "H2"];
+const DILUENTS = ["N2", "Ar", "CO2", "He", "air"];
+
+/* ---------- pure calculation ---------- */
+function muPure(id, T) {
+  const s = SP[id];
+  return s.mu0 * Math.pow(T / s.T0, 1.5) * (s.T0 + s.S) / (T + s.S);
+}
+function mixProps(comp, T, P) {
+  // comp: [[id, x], ...] mole fractions summing to 1
+  const M = comp.reduce((a, [id, x]) => a + x * SP[id].M, 0) / 1000; // kg/mol
+  const mus = comp.map(([id]) => muPure(id, T));
+  let mu = 0;
+  for (let i = 0; i < comp.length; i++) {
+    let den = 0;
+    for (let j = 0; j < comp.length; j++) {
+      const Mi = SP[comp[i][0]].M, Mj = SP[comp[j][0]].M;
+      const phi = Math.pow(1 + Math.sqrt(mus[i] / mus[j]) * Math.pow(Mj / Mi, 0.25), 2) /
+                  Math.sqrt(8 * (1 + Mi / Mj));
+      den += comp[j][1] * phi;
+    }
+    mu += comp[i][1] * mus[i] / den;
+  }
+  const rho = P * M / (R_GAS * T);
+  return { M, mu, rho };
+}
+function stoichAir(fuel) { // mol air per mol fuel
+  const f = SP[fuel];
+  return (f.C + f.H / 4) / O2_AIR;
+}
+function fuelAirStoichMass(fuel) {
+  return SP[fuel].M / (stoichAir(fuel) * SP.air.M);
+}
+function solveStream(cfg, env) {
+  let comp, xf;
+  if (cfg.mode === "premix") {
+    xf = cfg.phi / (cfg.phi + stoichAir(cfg.fuel));
+    comp = [[cfg.fuel, xf], ["air", 1 - xf]];
+  } else {
+    xf = cfg.chi / 100;
+    comp = [[cfg.fuel, xf], [cfg.dil, 1 - xf]];
+  }
+  const pr = mixProps(comp, cfg.T, env.P);
+  let U, Qact, Qstd;
+  if (cfg.inMode === "U") {
+    U = cfg.inVal; Qact = U * cfg.A;
+    Qstd = Qact * (env.Tstd / cfg.T) * (env.P / 101325) * 60000;
+  } else {
+    Qstd = cfg.inVal;
+    Qact = Qstd / 60000 * (cfg.T / env.Tstd) * (101325 / env.P);
+    U = Qact / cfg.A;
+  }
+  const mdot = pr.rho * Qact;
+  const mass = comp.map(([id, x]) => [id, mdot * x * SP[id].M / 1000 / pr.M]);
+  const mFuel = mass[0][1];
+  const mAir = mass.filter(([id]) => id === "air").reduce((a, [, m]) => a + m, 0);
+  const nu = pr.mu / pr.rho;
+  // ideal gas: mole fraction = volume fraction at the same T and P
+  const QfuelStd = Qstd * xf, QfuelAct = Qact * xf;
+  const QotherStd = Qstd * (1 - xf);
+  const Ueq = QfuelAct / cfg.A; // same fuel amount as pure fuel (chi = 100%) through the same flow area at the same T, P
+  return { comp, xf, M: pr.M, mu: pr.mu, rho: pr.rho, nu, U, Qact, Qstd, mdot, mFuel, mAir, QfuelStd, QfuelAct, QotherStd, Ueq };
+}
+function deriveRiRe(res, cfg, rhoRef) {
+  const L = cfg.L;
+  const Re = res.U * L / res.nu;
+  const dRho = (rhoRef - res.rho) / res.rho;
+  const Ri = G_ACC * (rhoRef - res.rho) * L / (res.rho * res.U * res.U);
+  const Fr = res.U * res.U / (G_ACC * L);
+  let rhoF = NaN, rStar = NaN, RiF = NaN;
+  if (isFinite(cfg.Tf) && cfg.Tf > 0) {
+    rhoF = res.rho * cfg.T / cfg.Tf;
+    rStar = rhoRef / rhoF;
+    RiF = G_ACC * (rhoRef - rhoF) * L / (res.rho * res.U * res.U);
+  }
+  const St = isFinite(cfg.f) ? cfg.f * L / res.U : NaN;
+  return { L, Re, Ri, dRho, Fr, rhoRef, rhoF, rStar, RiF, St };
+}
+function phiTotal(rs) {
+  let eq = 0, air = 0;
+  rs.forEach(({ cfg, res }) => { eq += res.mFuel / fuelAirStoichMass(cfg.fuel); air += res.mAir; });
+  return air > 0 ? eq / air : NaN;
+}
+
+/* ---------- formatting ---------- */
+function sciParts(v, sig = 3) {
+  if (!isFinite(v)) return null;
+  if (v === 0) return { s: "0" };
+  const a = Math.abs(v);
+  if (a >= 1e-2 && a < 1e5) {
+    const d = Math.max(0, sig - 1 - Math.floor(Math.log10(a)));
+    return { s: v.toFixed(Math.min(d, 8)).replace("-", "\u2212") };
+  }
+  const [m, e] = v.toExponential(sig - 1).split("e");
+  return { m: m.replace("-", "\u2212"), e: String(Number(e)).replace("-", "\u2212") };
+}
+function sci(v, sig = 3) {
+  const p = sciParts(v, sig);
+  if (!p) return "\u2014";
+  return p.s !== undefined ? p.s : p.m + "\u00d710<sup>" + p.e + "</sup>";
+}
+function plain(html) { return html.replace(/<sup>(.*?)<\/sup>/g, "^$1"); }
+function reLevel(Re) {
+  if (!isFinite(Re)) return [0, "—"];
+  if (Re < 2300) return [0, "層流域"];
+  if (Re < 4000) return [1, "遷移域"];
+  return [2, "乱流域"];
+}
+function riLevel(Ri) {
+  if (!isFinite(Ri)) return [0, "—"];
+  if (Ri < 0) return [1, "浮力が逆向き"];
+  if (Ri < 0.1) return [0, "慣性支配"];
+  if (Ri < 1) return [1, "中間"];
+  return [2, "浮力支配"];
+}
+
+/* ---------- UI ---------- */
+const $ = (id) => document.getElementById(id);
+const optHTML = (ids, sel) => ids.map((k) => `<option value="${k}"${k === sel ? " selected" : ""}>${SP[k].name}</option>`).join("");
+const fld = (id, label, inner, hint = "", cls = "") =>
+  `<div class="fld ${cls}"><label for="${id}">${label}</label>${inner}${hint ? `<small>${hint}</small>` : ""}</div>`;
+const num = (id, val, unit, extra = "") =>
+  `<div class="unit"><input type="number" id="${id}" step="any" value="${val}" ${extra}><span>${unit}</span></div>`;
+
+function streamHTML(p, title, sub, d) {
+  return `
+  <header><h2>${title}</h2><small>${sub}</small></header>
+  <div class="fld"><span class="lab">供給形態</span>
+    <div class="seg" role="radiogroup" aria-label="${title}の供給形態">
+      <input type="radio" name="${p}_mode" id="${p}_mode_premix" value="premix" ${d.mode === "premix" ? "checked" : ""}><label for="${p}_mode_premix">予混合</label>
+      <input type="radio" name="${p}_mode" id="${p}_mode_diff" value="diff" ${d.mode === "diff" ? "checked" : ""}><label for="${p}_mode_diff">拡散(燃料+希釈)</label>
+    </div></div>
+  <div class="grid">
+    ${fld(p + "_fuel", "燃料種", `<select id="${p}_fuel">${optHTML(FUELS, d.fuel)}</select>`)}
+    ${fld(p + "_phi", "当量比 φ", num(p + "_phi", d.phi, "", 'min="0"'), "空気は乾燥空気として計算します。", "only-premix")}
+    ${fld(p + "_chi", "燃料濃度 χ", num(p + "_chi", d.chi, "mol%", 'min="0" max="100"'), "体積(モル)分率です。", "only-diff")}
+    ${fld(p + "_dil", "希釈ガス", `<select id="${p}_dil">${optHTML(DILUENTS, d.dil)}</select>`, "χ が 100 のときは結果に影響しません。", "only-diff")}
+  </div>
+  <div class="grid">
+    ${fld(p + "_inmode", "流れの入力", `<select id="${p}_inmode"><option value="U">流速 U</option><option value="Q">流量 Q(MFC基準)</option></select>`)}
+    ${fld(p + "_inval", "値", num(p + "_inval", d.inval, '<span id="' + p + '_inunit">m/s</span>', 'min="0"'))}
+    ${fld(p + "_T", "ガス温度", num(p + "_T", 25, "°C"), "")}
+  </div>
+  <div class="grid">
+    ${fld(p + "_Lsel", "代表長さ L", `<select id="${p}_Lsel"></select>`, "Re・Ri・Fr・St に共通で使います。")}
+    ${fld(p + "_Lcustom", "任意の長さ", num(p + "_Lcustom", 10, "mm"), "", "only-custom-" + p)}
+    ${fld(p + "_ref", "Ri の基準密度", `<select id="${p}_ref"><option value="air">周囲空気</option><option value="other">もう一方の流れ</option></select>`, "ρ_ref として使う気体です。")}
+  </div>
+  <div class="grid">
+    ${fld(p + "_Tf", "火炎温度(任意)", num(p + "_Tf", "", "°C", 'placeholder="空欄で冷流のみ"'), "入れると火炎基準の Ri と r* も出します。")}
+    ${fld(p + "_f", "周波数 f(任意)", num(p + "_f", "", "Hz", 'placeholder="空欄で St なし"'), "St = f·L/U を出します。")}
+  </div>
+  <table class="res" id="${p}_table"></table>`;
+}
+
+const DEF = {
+  m: { mode: "premix", fuel: "CH4", phi: 0.6, chi: 100, dil: "N2", inval: 5.0 },
+  a: { mode: "diff", fuel: "CH4", phi: 0.6, chi: 100, dil: "N2", inval: 0.075 }
+};
+$("card-m").innerHTML = streamHTML("m", "主流(内管)", "内管の出口(D0)", DEF.m);
+$("card-a").innerHTML = streamHTML("a", "環状流", "内管と外管のすき間", DEF.a);
+
+let last = {};
+
+function read(id) { const s = $(id).value; return s.trim() === "" ? NaN : Number(s); }
+
+function readCfg(p, geo, same, Tamb) {
+  const mode = document.querySelector(`input[name="${p}_mode"]:checked`).value;
+  const Lsel = $(p + "_Lsel").value;
+  let L;
+  if (Lsel === "D0") L = geo.D0;
+  else if (Lsel === "Dh") L = geo.Dh;
+  else if (Lsel === "Dout") L = geo.Dout;
+  else L = read(p + "_Lcustom") / 1000;
+  const T = (same ? Tamb : read(p + "_T") + 273.15);
+  return {
+    fuel: $(p + "_fuel").value, mode,
+    phi: read(p + "_phi"), chi: read(p + "_chi"), dil: $(p + "_dil").value,
+    inMode: $(p + "_inmode").value, inVal: read(p + "_inval"),
+    T, A: p === "m" ? geo.A0 : geo.Aa, Lsel, L,
+    ref: $(p + "_ref").value,
+    Tf: read(p + "_Tf") + 273.15 * (isNaN(read(p + "_Tf")) ? 0 : 1),
+    f: read(p + "_f")
+  };
+}
+
+function lenLabel(v) { return isFinite(v) ? (v * 1000).toFixed(2).replace(/\.?0+$/, "") + " mm" : "—"; }
+
+function calc() {
+  const warns = [];
+  const same = $("c_same").checked;
+  const Tamb = read("c_Tamb") + 273.15;
+  const P = read("c_P") * 1000;
+  const Tstd = Number($("c_Tstd").value) + 273.15;
+  const D0 = read("g_D0") / 1000, Din = read("g_Din") / 1000, Dout = read("g_Dout") / 1000;
+  const Aov = read("g_Aov");
+  const A0 = Math.PI / 4 * D0 * D0;
+  const Aring = Math.PI / 4 * (Dout * Dout - Din * Din);
+  const Aa = (isFinite(Aov) && Aov > 0) ? Aov * 1e-6 : Aring;
+  const Dh = Dout - Din;
+  const geo = { D0, Din, Dout, A0, Aa, Dh };
+
+  if (!(Tamb > 0) || !(P > 0)) warns.push("周囲温度と圧力を入力してください。");
+  if (!(D0 > 0)) warns.push("主管内径 D0 は 0 より大きい値にしてください。");
+  if (isFinite(Din) && isFinite(D0) && Din < D0) warns.push("内管外径が主管内径より小さくなっています。内管の肉厚がマイナスです。");
+  if (!(Dout > Din)) warns.push("外管内径は内管外径より大きい値にしてください。環状流路の面積と水力直径が求まりません。");
+
+  // length options (labels carry current mm values)
+  ["m", "a"].forEach((p) => {
+    const sel = $(p + "_Lsel");
+    const cur = sel.value || (p === "m" ? "D0" : "Dh");
+    const opts = [
+      ["D0", `主管内径 D0(${lenLabel(D0)})`],
+      ["Dh", `環状の水力直径 Dh(${lenLabel(Dh)})`],
+      ["Dout", `外管内径(${lenLabel(Dout)})`],
+      ["custom", "任意の長さ"]
+    ];
+    const html = opts.map(([v, t]) => `<option value="${v}"${v === cur ? " selected" : ""}>${t}</option>`).join("");
+    if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
+    sel.value = cur;
+    document.querySelectorAll(".only-custom-" + p).forEach((e) => { e.style.display = (cur === "custom") ? "" : "none"; });
+  });
+
+  // temperature fields
+  ["m", "a"].forEach((p) => {
+    const t = $(p + "_T");
+    t.disabled = same;
+    if (same && isFinite(Tamb)) t.value = +(Tamb - 273.15).toFixed(2);
+    $(p + "_inunit").textContent = $(p + "_inmode").value === "U" ? "m/s" : "L/min";
+    $(p + "_inval").parentElement.parentElement.querySelector("label").textContent =
+      $(p + "_inmode").value === "U" ? "流速 U" : "流量 Q(" + $("c_Tstd").value + " °C, 1 atm)";
+  });
+  $("card-m").dataset.mode = document.querySelector('input[name="m_mode"]:checked').value;
+  $("card-a").dataset.mode = document.querySelector('input[name="a_mode"]:checked').value;
+
+  const env = { P, Tamb, Tstd };
+  const cfgs = { m: readCfg("m", geo, same, Tamb), a: readCfg("a", geo, same, Tamb) };
+  const names = { m: "主流", a: "環状流" };
+  const ok = {};
+  ["m", "a"].forEach((p) => {
+    const c = cfgs[p];
+    let bad = null;
+    if (!(c.T > 0)) bad = "ガス温度";
+    else if (c.mode === "premix" && !(c.phi > 0)) bad = "当量比 φ(0 より大きい値)";
+    else if (c.mode === "diff" && !(c.chi > 0 && c.chi <= 100)) bad = "燃料濃度 χ(0 を超え 100 以下)";
+    else if (!(c.inVal > 0)) bad = c.inMode === "U" ? "流速(0 より大きい値)" : "流量(0 より大きい値)";
+    else if (!(c.A > 0)) bad = "流路断面積";
+    else if (!(c.L > 0)) bad = "代表長さ";
+    else if (!(P > 0)) bad = "圧力";
+    if (bad) warns.push(`${names[p]}の入力を確認してください: ${bad}。`);
+    ok[p] = !bad;
+  });
+
+  const out = {};
+  ["m", "a"].forEach((p) => { if (ok[p]) out[p] = { cfg: cfgs[p], res: solveStream(cfgs[p], env) }; });
+  const rhoAir = P * SP.air.M / 1000 / (R_GAS * Tamb);
+  ["m", "a"].forEach((p) => {
+    if (!out[p]) return;
+    const q = p === "m" ? "a" : "m";
+    let rhoRef = rhoAir;
+    if (out[p].cfg.ref === "other") {
+      if (out[q]) rhoRef = out[q].res.rho; else warns.push(`${names[p]}の基準密度に使うもう一方の流れが未入力のため、周囲空気で計算しています。`);
+    }
+    out[p].d = deriveRiRe(out[p].res, out[p].cfg, rhoRef);
+    out[p].refLabel = (out[p].cfg.ref === "other" && out[q]) ? "もう一方の流れ" : "周囲空気";
+    if (out[p].cfg.mode === "premix" && out[p].cfg.phi > 6) warns.push(`${names[p]}の当量比が非常に大きい値です(φ=${out[p].cfg.phi})。`);
+  });
+
+  last = out;
+  render(out, geo, warns, env);
+}
+
+function row(label, val, unit, cls = "") {
+  return `<tr class="${cls}"><th>${label}</th><td class="n">${val}</td><td class="u">${unit || ""}</td></tr>`;
+}
+function compText(r) {
+  return r.res.comp.map(([id, x]) => `${SP[id].name.split(" ").pop()} ${(x * 100).toFixed(2)}%`).join(" / ");
+}
+
+function tileHTML(cls, label, value, sub, lv) {
+  return `<div class="tile ${cls}"><div class="k"><b>${label}</b></div><div class="v">${value}</div><div class="s">${sub}</div><span class="pill l${lv[0]}">${lv[1]}</span></div>`;
+}
+
+function render(out, geo, warns, env) {
+  // band
+  const t = [];
+  [["m", "主流", "Re"], ["m", "主流", "Ri"], ["a", "環状流", "Re"], ["a", "環状流", "Ri"]].forEach(([p, nm, kind]) => {
+    const o = out[p];
+    if (!o) { t.push(tileHTML(p, `${nm} ${kind}`, "—", "入力を確認", [0, "—"])); return; }
+    if (kind === "Re") {
+      t.push(tileHTML(p, `${nm} Re`, sci(o.d.Re), `U=${sci(o.res.U)} m/s · L=${lenLabel(o.d.L)}`, reLevel(o.d.Re)));
+    } else {
+      t.push(tileHTML(p, `${nm} Ri`, sci(o.d.Ri), `基準: ${o.refLabel}`, riLevel(o.d.Ri)));
+    }
+  });
+  $("band").innerHTML = t.join("");
+
+  $("warns").innerHTML = warns.map((w) => `<div class="warn">${w}</div>`).join("");
+
+  // geometry derived
+  const wall = (geo.Din - geo.D0) / 2;
+  $("geo-derived").innerHTML = [
+    ["主管の断面積", `<b>${sci(geo.A0 * 1e6)}</b> mm²`],
+    ["環状の断面積", `<b>${sci(geo.Aa * 1e6)}</b> mm²`],
+    ["環状/主管 面積比", `<b>${sci(geo.Aa / geo.A0)}</b>`],
+    ["環状の水力直径", `<b>${lenLabel(geo.Dh)}</b>`],
+    ["内管の肉厚", `<b>${isFinite(wall) ? wall.toFixed(2) : "—"}</b> mm`]
+  ].map(([k, v]) => `<div>${k} ${v}</div>`).join("");
+
+  // stream tables
+  ["m", "a"].forEach((p) => {
+    const o = out[p];
+    const tb = $(p + "_table");
+    if (!o) { tb.innerHTML = row("結果", "入力を確認してください", ""); return; }
+    const { cfg, res, d } = o;
+    const kind = cfg.mode === "premix" ? `予混合 φ=${cfg.phi}` : `拡散 χ=${cfg.chi}%`;
+    let h = "";
+    h += row("Re", sci(d.Re), "", "key");
+    h += row("Ri(冷流)", sci(d.Ri), "", "key");
+    h += row("Fr = U²/gL", sci(d.Fr), "");
+    h += row("(ρ_ref − ρ_j)/ρ_j", sci(d.dRho), "");
+    if (isFinite(d.RiF)) {
+      h += row("Ri(火炎基準)", sci(d.RiF), "", "key");
+      h += row("r* = ρ_ref/ρ_f", sci(d.rStar), "");
+    }
+    if (isFinite(d.St)) h += row("St = fL/U", sci(d.St), "", "key");
+    const basis = (env.Tstd - 273.15).toFixed(0) + " °C";
+    const otherName = cfg.mode === "premix" ? "空気" : "希釈ガス(" + SP[cfg.dil].name.split(" ").pop() + ")";
+    h += `<tr class="sec"><th colspan="3">流量</th></tr>`;
+    h += row("流速 U", sci(res.U), "m/s", "key");
+    const Tg = "実際 " + +(cfg.T - 273.15).toFixed(1) + " °C";
+    h += row("流量(全体・" + Tg + ")", sci(res.Qact * 60000), "L/min", "key");
+    h += row("流量(全体・MFC基準 " + basis + ")", sci(res.Qstd), "L/min");
+    h += row("質量流量(全体)", sci(res.mdot * 1000), "g/s");
+    h += row("燃料のみの流量(" + Tg + ")", sci(res.QfuelAct * 60000), "L/min", "key");
+    h += row("燃料のみの流量(MFC基準 " + basis + ")", sci(res.QfuelStd), "L/min");
+    h += row("燃料のみの質量流量", sci(res.mFuel * 1000), "g/s");
+    if (res.xf < 1) h += row(otherName + "の流量(MFC基準 " + basis + ")", sci(res.QotherStd), "L/min");
+    h += row("同じ燃料量を純燃料(拡散 χ=100%)で流した場合の流速", sci(res.Ueq), "m/s", "key");
+    h += `<tr class="sec"><th colspan="3">気体の物性</th></tr>`;
+    h += row("組成(モル分率)", compText(o), "");
+    h += row("モル質量 M", sci(res.M * 1000), "g/mol");
+    h += row("密度 ρ_j", sci(res.rho), "kg/m³");
+    h += row("粘度 μ", sci(res.mu), "Pa·s");
+    h += row("動粘度 ν", sci(res.nu), "m²/s");
+    h += row("ρ_ref(" + o.refLabel + ")", sci(d.rhoRef), "kg/m³");
+    if (isFinite(d.rhoF)) h += row("火炎ガス密度 ρ_f", sci(d.rhoF), "kg/m³");
+    h += row("代表長さ L", lenLabel(d.L), "");
+    h += row("条件", kind, "");
+    tb.innerHTML = h;
+  });
+
+  // combined
+  const c = [];
+  if (out.m && out.a) {
+    const vr = out.m.res.U / out.a.res.U;
+    const mom = (out.m.res.rho * out.m.res.U ** 2) / (out.a.res.rho * out.a.res.U ** 2);
+    const pt = phiTotal([out.m, out.a]);
+    c.push(row("流速比 U0/Uco", sci(vr), "", "key"));
+    c.push(row("運動量流束比 ρ0U0²/ρcoUco²", sci(mom), ""));
+    c.push(row("密度比 ρ0/ρco", sci(out.m.res.rho / out.a.res.rho), ""));
+    c.push(row("全体当量比 φ_total", sci(pt), "", "key"));
+    c.push(row("燃料体積流量の合計(実際の温度)", sci((out.m.res.QfuelAct + out.a.res.QfuelAct) * 60000), "L/min", "key"));
+    c.push(row("燃料体積流量の合計(MFC基準 " + (env.Tstd - 273.15).toFixed(0) + " °C)", sci(out.m.res.QfuelStd + out.a.res.QfuelStd), "L/min"));
+    c.push(row("燃料質量流量の合計", sci((out.m.res.mFuel + out.a.res.mFuel) * 1000), "g/s"));
+    c.push(row("環状/主管 面積比", sci(geo.Aa / geo.A0), ""));
+  } else {
+    c.push(row("結果", "両方の流れの入力が揃うと表示します", ""));
+  }
+  $("comb-table").innerHTML = c.join("");
+
+  // text
+  const L = [];
+  L.push("同軸ノズル Ri・Re 計算");
+  L.push(`周囲 ${(env.Tamb - 273.15).toFixed(1)} °C, ${(env.P / 1000).toFixed(3)} kPa / D0=${lenLabel(geo.D0)}, 内管外径=${lenLabel(geo.Din)}, 外管内径=${lenLabel(geo.Dout)}, 環状面積=${sci(geo.Aa * 1e6, 4)} mm²`);
+  ["m", "a"].forEach((p) => {
+    const o = out[p]; const nm = p === "m" ? "主流" : "環状流";
+    if (!o) { L.push(`[${nm}] 入力を確認してください`); return; }
+    const { cfg, res, d } = o;
+    L.push(`[${nm}] ${SP[cfg.fuel].name} ${cfg.mode === "premix" ? "予混合 φ=" + cfg.phi : "拡散 χ=" + cfg.chi + "% 希釈=" + SP[cfg.dil].name} T=${(cfg.T - 273.15).toFixed(1)} °C`);
+    L.push(`  U=${plain(sci(res.U, 4))} m/s, Q=${plain(sci(res.Qact * 60000, 4))} L/min(実際 ${(cfg.T - 273.15).toFixed(1)} °C) / ${plain(sci(res.Qstd, 4))} L/min(MFC基準 ${$("c_Tstd").value} °C), L=${lenLabel(d.L)}`);
+    L.push(`  燃料のみ: ${plain(sci(res.QfuelAct * 60000, 4))} L/min(実際) / ${plain(sci(res.QfuelStd, 4))} L/min(MFC基準), ${plain(sci(res.mFuel * 1000, 4))} g/s, 純燃料換算の流速 ${plain(sci(res.Ueq, 4))} m/s`);
+    L.push(`  rho=${plain(sci(res.rho, 4))} kg/m3, mu=${plain(sci(res.mu, 4))} Pa s, nu=${plain(sci(res.nu, 4))} m2/s`);
+    L.push(`  Re=${plain(sci(d.Re, 4))}, Ri=${plain(sci(d.Ri, 4))} (基準: ${o.refLabel}), Fr=${plain(sci(d.Fr, 4))}` +
+      (isFinite(d.RiF) ? `, Ri(火炎)=${plain(sci(d.RiF, 4))}, r*=${plain(sci(d.rStar, 4))}` : "") +
+      (isFinite(d.St) ? `, St=${plain(sci(d.St, 4))}` : ""));
+  });
+  if (out.m && out.a) {
+    L.push(`[比較] U0/Uco=${plain(sci(out.m.res.U / out.a.res.U, 4))}, phi_total=${plain(sci(phiTotal([out.m, out.a]), 4))}`);
+  }
+  $("out-text").textContent = L.join("\n");
+  renderMath(out, geo, env);
+}
+
+/* ---------- events ---------- */
+document.querySelectorAll("input, select").forEach((el) => {
+  if (el.id === "m_inmode" || el.id === "a_inmode") return;
+  el.addEventListener("input", calc);
+  el.addEventListener("change", calc);
+});
+// Switching U <-> Q keeps the same physical flow: convert from the last valid result, then recompute.
+["m", "a"].forEach((p) => {
+  $(p + "_inmode").addEventListener("change", () => {
+    const o = last[p];
+    if (o) {
+      const v = $(p + "_inmode").value === "U" ? o.res.U : o.res.Qstd;
+      $(p + "_inval").value = +Number(v).toPrecision(6);
+    }
+    calc();
+  });
+});
+
+const PRESETS = {
+  thesis: {
+    m: { mode: "premix", fuel: "CH4", phi: 0.6, inval: 5.0, L: "D0" },
+    a: { mode: "diff", fuel: "CH4", chi: 100, dil: "N2", inval: 0.08, L: "Dh" }
+  },
+  sotsuron: {
+    m: { mode: "premix", fuel: "CH4", phi: 0.6, inval: 5.0, L: "D0" },
+    a: { mode: "diff", fuel: "CH4", chi: 100, dil: "N2", inval: 0.075, L: "D0" }
+  },
+  c3h8: {
+    m: { mode: "premix", fuel: "C3H8", phi: 0.43, inval: 2.0, L: "D0" },
+    a: { mode: "diff", fuel: "C3H8", chi: 100, dil: "N2", inval: 0.015, L: "Dh" }
+  }
+};
+function applyPreset(name) {
+  const pr = PRESETS[name];
+  ["m", "a"].forEach((p) => {
+    const s = pr[p];
+    document.querySelector(`input[name="${p}_mode"][value="${s.mode}"]`).checked = true;
+    $(p + "_fuel").value = s.fuel;
+    if (s.phi !== undefined) $(p + "_phi").value = s.phi;
+    if (s.chi !== undefined) $(p + "_chi").value = s.chi;
+    if (s.dil) $(p + "_dil").value = s.dil;
+    $(p + "_inmode").value = "U";
+    $(p + "_inval").value = s.inval;
+    $(p + "_Lsel").value = s.L;
+    $(p + "_Tf").value = ""; $(p + "_f").value = "";
+  });
+  calc();
+}
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => applyPreset(b.dataset.preset)));
+
+$("copy").addEventListener("click", async () => {
+  const txt = $("out-text").textContent;
+  const msg = $("copy-msg");
+  try {
+    await navigator.clipboard.writeText(txt);
+    msg.textContent = "コピーしました。";
+  } catch (e) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      const okc = document.execCommand("copy"); document.body.removeChild(ta);
+      msg.textContent = okc ? "コピーしました。" : "コピーできませんでした。下の結果テキストを選択してコピーしてください。";
+    } catch (e2) {
+      msg.textContent = "コピーできませんでした。下の結果テキストを選択してコピーしてください。";
+    }
+  }
+  if (msg.textContent.indexOf("できません") >= 0) document.querySelector("#combined details").open = true;
+});
+
+/* ---------- MathML builders (native MathML, no library) ---------- */
+const mi = (s) => `<mi>${s}</mi>`, mn = (s) => `<mn>${s}</mn>`, mo = (s) => `<mo>${s}</mo>`, mt = (s) => `<mtext>${s}</mtext>`;
+const rw = (...a) => `<mrow>${a.join("")}</mrow>`;
+const sb = (b, s) => `<msub>${b}${s}</msub>`;
+const sp = (b, p) => `<msup>${b}${p}</msup>`;
+const ss = (b, s, p) => `<msubsup>${b}${s}${p}</msubsup>`;
+const fr = (n, d) => `<mfrac>${n}${d}</mfrac>`;
+const sq = (x) => `<msqrt>${x}</msqrt>`;
+const par = (...a) => rw(mo("("), ...a, mo(")"));
+const brk = (...a) => rw(mo("["), ...a, mo("]"));
+const EQ = mo("=");
+const sy = (n, s) => sb(mi(n), /^\d+$/.test(s) ? mn(s) : (s.length === 1 ? mi(s) : mt(s)));
+const sum = (i) => `<munder>${mo("\u2211")}${mi(i)}</munder>`;
+const md = (s) => sb(`<mover>${mi("m")}${mo("\u02d9")}</mover>`, s);
+const mb = (inner) => `<math display="block"><mrow>${inner}</mrow></math>`;
+const sciML = (v, sig = 3) => {
+  const p = sciParts(v, sig);
+  if (!p) return mt("\u2014");
+  return p.s !== undefined ? mn(p.s) : rw(mn(p.m), mo("\u00d7"), sp(mn("10"), mn(p.e)));
+};
+const unitML = (u) => mt("\u2009" + u);
+
+/* ---------- equation list ---------- */
+const FA_ST = sb(par(mi("F"), mo("/"), mi("A")), mt("st"));
+const EQS = [
+  { g: "流路", items: [
+    ["主流路の断面積", rw(sy("A", "0"), EQ, fr(mi("\u03c0"), mn("4")), ss(mi("D"), mn("0"), mn("2")))],
+    ["環状流路の断面積", rw(sy("A", "a"), EQ, fr(mi("\u03c0"), mn("4")), par(ss(mi("D"), mt("out"), mn("2")), mo("\u2212"), ss(mi("D"), mt("in"), mn("2"))))],
+    ["環状の水力直径", rw(sy("D", "h"), EQ, sy("D", "out"), mo("\u2212"), sy("D", "in"))]
+  ] },
+  { g: "組成", items: [
+    ["燃料のモル分率(予混合)", rw(sy("x", "f"), EQ, fr(mi("\u03c6"), rw(mi("\u03c6"), mo("+"), sy("A", "st"))))],
+    ["量論の空気モル数", rw(sy("A", "st"), EQ, fr(par(sy("n", "C"), mo("+"), fr(sy("n", "H"), mn("4"))), mn("0.20946")))],
+    ["燃料のモル分率(拡散)", rw(sy("x", "f"), EQ, fr(mi("\u03c7"), mn("100")))],
+    ["量論の燃空比(質量)", rw(FA_ST, EQ, fr(sy("M", "f"), rw(sy("A", "st"), sy("M", "air"))))]
+  ] },
+  { g: "物性", items: [
+    ["モル質量", rw(mi("M"), EQ, sum("i"), sy("x", "i"), sy("M", "i"))],
+    ["密度(理想気体)", rw(sy("\u03c1", "j"), EQ, fr(rw(mi("P"), mi("M")), rw(mi("R"), mi("T"))))],
+    ["純ガスの粘度(Sutherland)", rw(sy("\u03bc", "i"), EQ, sy("\u03bc", "0"), sp(par(fr(mi("T"), sy("T", "0"))), fr(mn("3"), mn("2"))), fr(rw(sy("T", "0"), mo("+"), mi("S")), rw(mi("T"), mo("+"), mi("S"))))],
+    ["混合ガスの粘度(Wilke)", rw(mi("\u03bc"), EQ, sum("i"), fr(rw(sy("x", "i"), sy("\u03bc", "i")), rw(sum("j"), sy("x", "j"), sb(mi("\u03a6"), rw(mi("i"), mi("j"))))))],
+    ["Wilke の係数", rw(sb(mi("\u03a6"), rw(mi("i"), mi("j"))), EQ, fr(sp(brk(mn("1"), mo("+"), sp(par(fr(sy("\u03bc", "i"), sy("\u03bc", "j"))), fr(mn("1"), mn("2"))), sp(par(fr(sy("M", "j"), sy("M", "i"))), fr(mn("1"), mn("4")))), mn("2")), rw(sq(mn("8")), sp(par(mn("1"), mo("+"), fr(sy("M", "i"), sy("M", "j"))), fr(mn("1"), mn("2"))))))],
+    ["動粘度", rw(mi("\u03bd"), EQ, fr(mi("\u03bc"), sy("\u03c1", "j")))]
+  ] },
+  { g: "流量", items: [
+    ["実際の体積流量", rw(sy("Q", "act"), EQ, sy("Q", "std"), mo("\u00d7"), fr(mi("T"), sy("T", "std")), mo("\u00d7"), fr(mn("101325"), mi("P")))],
+    ["流速", rw(mi("U"), EQ, fr(sy("Q", "act"), mi("A")))],
+    ["質量流量", rw(`<mover>${mi("m")}${mo("\u02d9")}</mover>`, EQ, sy("\u03c1", "j"), sy("Q", "act"))],
+    ["燃料のみの流量", rw(sy("Q", "f"), EQ, sy("x", "f"), mi("Q"))],
+    ["純燃料に換算した流速", rw(sy("U", "eq"), EQ, sy("x", "f"), mi("U"), EQ, fr(sy("Q", "f,act"), mi("A")))]
+  ] },
+  { g: "無次元数", items: [
+    ["レイノルズ数", rw(mi("Re"), EQ, fr(rw(mi("U"), mi("L")), mi("\u03bd")))],
+    ["リチャードソン数", rw(mi("Ri"), EQ, fr(rw(mi("g"), par(sy("\u03c1", "ref"), mo("\u2212"), sy("\u03c1", "b")), mi("L")), rw(sy("\u03c1", "j"), sp(mi("U"), mn("2")))))],
+    ["浮力の密度(冷流)", rw(sy("\u03c1", "b"), EQ, sy("\u03c1", "j"))],
+    ["浮力の密度(火炎温度あり)", rw(sy("\u03c1", "b"), EQ, sy("\u03c1", "f"), EQ, sy("\u03c1", "j"), mo("\u00d7"), fr(sy("T", "j"), sy("T", "f")))],
+    ["フルード数", rw(mi("Fr"), EQ, fr(sp(mi("U"), mn("2")), rw(mi("g"), mi("L"))))],
+    ["Ri と Fr の関係(冷流)", rw(mi("Ri"), EQ, fr(rw(sy("\u03c1", "ref"), mo("\u2212"), sy("\u03c1", "j")), sy("\u03c1", "j")), mo("\u00d7"), fr(mn("1"), mi("Fr")))],
+    ["ストローハル数", rw(mi("St"), EQ, fr(rw(mi("f"), mi("L")), mi("U")))],
+    ["密度比 r*", rw(sp(mi("r"), mo("*")), EQ, fr(sy("\u03c1", "ref"), sy("\u03c1", "f")))]
+  ] },
+  { g: "二つの流れの比較", items: [
+    ["流速比", rw(fr(sy("U", "0"), sy("U", "co")))],
+    ["運動量流束比", rw(fr(rw(sy("\u03c1", "0"), ss(mi("U"), mn("0"), mn("2"))), rw(sy("\u03c1", "co"), ss(mi("U"), mt("co"), mn("2")))))],
+    ["全体当量比", rw(sy("\u03c6", "total"), EQ, fr(rw(sum("i"), fr(md(rw(mt("f,"), mi("i"))), sb(par(mi("F"), mo("/"), mi("A")), rw(mt("st,"), mi("i"))))), rw(sum("i"), md(rw(mt("air,"), mi("i"))))))]
+  ] }
+];
+const SYMS = [
+  ["A<sub>0</sub>, A<sub>a</sub>", "主流路・環状流路の断面積", "m²"],
+  ["D<sub>0</sub>, D<sub>in</sub>, D<sub>out</sub>, D<sub>h</sub>", "主管内径、内管外径、外管内径、環状の水力直径", "m"],
+  ["L", "代表長さ(D<sub>0</sub>、D<sub>h</sub>、D<sub>out</sub>、任意から選ぶ)", "m"],
+  ["φ, χ", "当量比(予混合)、燃料濃度(拡散)", "−, mol%"],
+  ["x<sub>f</sub>, x<sub>i</sub>", "燃料と成分 i のモル分率", "−"],
+  ["n<sub>C</sub>, n<sub>H</sub>", "燃料 1 分子の C と H の原子数", "−"],
+  ["A<sub>st</sub>", "量論の空気モル数(燃料 1 mol あたり)", "mol/mol"],
+  ["(F/A)<sub>st</sub>", "量論の燃空比(質量)", "−"],
+  ["M, M<sub>i</sub>, M<sub>f</sub>, M<sub>air</sub>", "モル質量(混合、成分、燃料、空気)", "kg/mol"],
+  ["P, T, R", "圧力、ガス温度、気体定数 8.3145", "Pa, K, J/(mol·K)"],
+  ["T<sub>j</sub>, T<sub>f</sub>", "出口ガス温度、火炎温度", "K"],
+  ["ρ<sub>j</sub>", "出口ガスの密度", "kg/m³"],
+  ["ρ<sub>ref</sub>", "基準密度(周囲空気、またはもう一方の流れ)", "kg/m³"],
+  ["ρ<sub>b</sub>, ρ<sub>f</sub>", "浮力に使う密度、火炎ガスの密度", "kg/m³"],
+  ["μ, μ<sub>i</sub>, μ<sub>0</sub>, T<sub>0</sub>, S", "粘度(混合、成分)、Sutherland 式の基準粘度・基準温度・定数", "Pa·s, K"],
+  ["Φ<sub>ij</sub>", "Wilke の係数", "−"],
+  ["ν", "動粘度", "m²/s"],
+  ["Q<sub>std</sub>, Q<sub>act</sub>, T<sub>std</sub>", "MFC 基準の体積流量、実際の体積流量、MFC の基準温度", "m³/s, K"],
+  ["Q<sub>f</sub>", "燃料のみの体積流量", "m³/s"],
+  ["U, U<sub>0</sub>, U<sub>co</sub>, U<sub>eq</sub>", "流速(主流、環状流)、純燃料に換算した流速", "m/s"],
+  ["ṁ", "質量流量(f は燃料、air は空気)", "kg/s"],
+  ["g, f", "重力加速度 9.80665、周波数", "m/s², Hz"],
+  ["φ<sub>total</sub>", "全体当量比(修論 3・5 の定義)", "−"]
+];
+
+function buildStaticMath() {
+  let n = 0;
+  $("eqs").innerHTML = EQS.map((grp) => {
+    const items = grp.items.map(([t, m]) => { n++; return `<div class="eq"><div class="t"><b>(${n})</b>${t}</div><div class="mw">${mb(m)}</div></div>`; }).join("");
+    return `<div><h3>${grp.g}</h3><div class="eq-grid">${items}</div></div>`;
+  }).join("");
+  $("symtab").innerHTML = `<h3 style="margin-bottom:6px">記号</h3><table><tbody>${SYMS.map(([a, b, c]) => `<tr><th>${a}</th><td style="color:var(--ink);font-family:var(--font-body)">${b}</td><td>${c}</td></tr>`).join("")}</tbody></table>`;
+}
+
+/* ---------- substitution with current values ---------- */
+function substLines(o, env) {
+  const { cfg, res, d } = o;
+  const out = [];
+  const g = G_ACC;
+  if (cfg.mode === "premix") {
+    const Ast = stoichAir(cfg.fuel);
+    out.push(rw(sy("x", "f"), EQ, fr(sciML(cfg.phi), rw(sciML(cfg.phi), mo("+"), sciML(Ast, 4))), EQ, sciML(res.xf, 4)));
+  } else {
+    out.push(rw(sy("x", "f"), EQ, fr(sciML(cfg.chi), mn("100")), EQ, sciML(res.xf, 4)));
+  }
+  out.push(rw(sy("\u03c1", "j"), EQ, fr(rw(sciML(env.P, 6), mo("\u00d7"), sciML(res.M, 4)), rw(sciML(R_GAS, 5), mo("\u00d7"), sciML(cfg.T, 5))), EQ, sciML(res.rho, 4), unitML("kg/m\u00b3")));
+  out.push(rw(mi("\u03bd"), EQ, fr(sciML(res.mu, 4), sciML(res.rho, 4)), EQ, sciML(res.nu, 3), unitML("m\u00b2/s")));
+  out.push(rw(mi("U"), EQ, fr(sciML(res.Qact, 4), sciML(cfg.A, 4)), EQ, sciML(res.U, 4), unitML("m/s")));
+  out.push(rw(mi("Re"), EQ, fr(rw(sciML(res.U, 4), mo("\u00d7"), sciML(d.L, 3)), sciML(res.nu, 4)), EQ, sciML(d.Re, 4)));
+  out.push(rw(mi("Ri"), EQ,
+    fr(rw(sciML(g, 6), mo("\u00d7"), par(sciML(d.rhoRef, 4), mo("\u2212"), sciML(res.rho, 4)), mo("\u00d7"), sciML(d.L, 3)),
+       rw(sciML(res.rho, 4), mo("\u00d7"), sp(par(sciML(res.U, 4)), mn("2")))), EQ, sciML(d.Ri, 3)));
+  out.push(rw(mi("Fr"), EQ, fr(sp(par(sciML(res.U, 4)), mn("2")), rw(sciML(g, 6), mo("\u00d7"), sciML(d.L, 3))), EQ, sciML(d.Fr, 4)));
+  out.push(rw(sy("U", "eq"), EQ, sy("x", "f"), mi("U"), EQ, sciML(res.xf, 4), mo("\u00d7"), sciML(res.U, 4), EQ, sciML(res.Ueq, 4), unitML("m/s")));
+  if (isFinite(d.rhoF)) {
+    out.push(rw(sy("\u03c1", "f"), EQ, sy("\u03c1", "j"), fr(sy("T", "j"), sy("T", "f")), EQ, sciML(res.rho, 4), mo("\u00d7"), fr(sciML(cfg.T, 5), sciML(cfg.Tf, 5)), EQ, sciML(d.rhoF, 4), unitML("kg/m\u00b3")));
+    out.push(rw(mi("Ri"), EQ,
+      fr(rw(sciML(g, 6), mo("\u00d7"), par(sciML(d.rhoRef, 4), mo("\u2212"), sciML(d.rhoF, 4)), mo("\u00d7"), sciML(d.L, 3)),
+         rw(sciML(res.rho, 4), mo("\u00d7"), sp(par(sciML(res.U, 4)), mn("2")))), EQ, sciML(d.RiF, 3), mt("\u2003(火炎温度あり)")));
+  }
+  if (isFinite(d.St)) out.push(rw(mi("St"), EQ, fr(rw(sciML(cfg.f, 4), mo("\u00d7"), sciML(d.L, 3)), sciML(res.U, 4)), EQ, sciML(d.St, 4)));
+  return out;
+}
+function renderSubst(out, env) {
+  const cards = [];
+  [["m", "主流"], ["a", "環状流"]].forEach(([p, nm]) => {
+    const o = out[p];
+    cards.push(`<div class="sub-card ${p}"><h3>${nm}</h3>${o ? `<div class="mw">${substLines(o, env).map(mb).join("")}</div>` : "<p>入力を確認してください。</p>"}</div>`);
+  });
+  if (out.m && out.a) {
+    const A = fuelAirStoichMass, m = out.m, a = out.a;
+    const t1 = fr(sciML(m.res.mFuel * 1000, 4), sciML(A(m.cfg.fuel), 4)), t2 = fr(sciML(a.res.mFuel * 1000, 4), sciML(A(a.cfg.fuel), 4));
+    const pt = phiTotal([m, a]);
+    const lines = [
+      rw(fr(sy("U", "0"), sy("U", "co")), EQ, fr(sciML(m.res.U, 4), sciML(a.res.U, 4)), EQ, sciML(m.res.U / a.res.U, 4)),
+      rw(fr(rw(sy("\u03c1", "0"), ss(mi("U"), mn("0"), mn("2"))), rw(sy("\u03c1", "co"), ss(mi("U"), mt("co"), mn("2")))), EQ,
+         fr(rw(sciML(m.res.rho, 4), mo("\u00d7"), sciML(m.res.U ** 2, 4)), rw(sciML(a.res.rho, 4), mo("\u00d7"), sciML(a.res.U ** 2, 4))), EQ, sciML((m.res.rho * m.res.U ** 2) / (a.res.rho * a.res.U ** 2), 4)),
+      rw(sy("\u03c6", "total"), EQ, fr(rw(t1, mo("+"), t2), rw(sciML(m.res.mAir * 1000, 4), mo("+"), sciML(a.res.mAir * 1000, 4))), EQ, sciML(pt, 4), mt("\u2003(質量流量は g/s)"))
+    ];
+    cards.push(`<div class="sub-card k"><h3>二つの流れの比較</h3><div class="mw">${lines.map(mb).join("")}</div></div>`);
+  }
+  $("subst").innerHTML = cards.join("");
+}
+
+/* ---------- Fig.1 live labels ---------- */
+function mmText(v) { return isFinite(v) ? +(v * 1000).toFixed(2) + " mm" : "\u2014"; }
+function setFig1(geo) {
+  const tsp = (name, sub, val) => `${name}<tspan dy="3" font-size="9">${sub}</tspan><tspan dy="-3"> = ${val}</tspan>`;
+  $("f1_dout").innerHTML = tsp("D", "out", mmText(geo.Dout));
+  $("f1_din").innerHTML = tsp("D", "in", mmText(geo.Din));
+  $("f1_d0").innerHTML = tsp("D", "0", mmText(geo.D0));
+  $("f1_dh").innerHTML = tsp("D", "h", mmText(geo.Dh));
+  $("f1_A0").textContent = "A0 = " + (isFinite(geo.A0) ? +(geo.A0 * 1e6).toPrecision(4) : "\u2014") + " mm\u00b2";
+  $("f1_Aa").textContent = "Aa = " + (isFinite(geo.Aa) ? +(geo.Aa * 1e6).toPrecision(4) : "\u2014") + " mm\u00b2";
+}
+
+/* ---------- Fig.3 Re-Ri map ---------- */
+function svgNum(v, sig = 3) {
+  const p = sciParts(v, sig);
+  if (!p) return "\u2014";
+  return p.s !== undefined ? p.s : `${p.m}\u00d710<tspan dy="-5" font-size="10">${p.e}</tspan><tspan dy="5"> </tspan>`;
+}
+function drawMap(out) {
+  const L = 76, T = 44, pw = 650, ph = 342, x0 = 1, x1 = 5, y0 = -6, y1 = 3;
+  const lx = (v) => Math.log10(v);
+  const X = (re) => L + (Math.min(Math.max(lx(re), x0), x1) - x0) / (x1 - x0) * pw;
+  const Y = (ri) => T + ph - (Math.min(Math.max(lx(ri), y0), y1) - y0) / (y1 - y0) * ph;
+  let s = "";
+  // Ri bands
+  s += `<rect x="${L}" y="${Y(1e3)}" width="${pw}" height="${Y(1) - Y(1e3)}" class="band2"/>`;
+  s += `<rect x="${L}" y="${Y(1)}" width="${pw}" height="${Y(0.1) - Y(1)}" class="band1"/>`;
+  s += `<rect x="${L}" y="${Y(0.1)}" width="${pw}" height="${Y(1e-6) - Y(0.1)}" class="band0"/>`;
+  // grid
+  for (let e = x0; e <= x1; e++) s += `<path d="M${X(10 ** e)} ${T}V${T + ph}" class="grid"/>`;
+  for (let e = y0; e <= y1; e++) s += `<path d="M${L} ${Y(10 ** e)}H${L + pw}" class="grid"/>`;
+  // regime lines
+  s += `<path d="M${X(2300)} ${T}V${T + ph}M${X(4000)} ${T}V${T + ph}" class="dash"/>`;
+  s += `<path d="M${L} ${Y(0.1)}H${L + pw}M${L} ${Y(1)}H${L + pw}" class="dash"/>`;
+  // Re chips on top
+  s += `<rect x="${L}" y="${T - 28}" width="${X(2300) - L}" height="22" class="chip0"/><text x="${(L + X(2300)) / 2}" y="${T - 12}" text-anchor="middle" class="sm">層流域</text>`;
+  s += `<rect x="${X(2300)}" y="${T - 28}" width="${X(4000) - X(2300)}" height="22" class="chip1"/><text x="${(X(2300) + X(4000)) / 2}" y="${T - 12}" text-anchor="middle" class="sm" font-size="10">遷移</text>`;
+  s += `<rect x="${X(4000)}" y="${T - 28}" width="${L + pw - X(4000)}" height="22" class="chip2"/><text x="${(X(4000) + L + pw) / 2}" y="${T - 12}" text-anchor="middle" class="sm">乱流域</text>`;
+  // Ri labels at right inside
+  s += `<text x="${L + pw - 8}" y="${(Y(1e3) + Y(1)) / 2 + 4}" text-anchor="end" class="sm bd" style="fill:var(--lv2)">浮力支配 |Ri| &gt; 1</text>`;
+  s += `<text x="${L + pw - 8}" y="${(Y(1) + Y(0.1)) / 2 + 4}" text-anchor="end" class="sm bd" style="fill:var(--lv1)">中間</text>`;
+  s += `<text x="${L + pw - 8}" y="${Y(0.1) + 18}" text-anchor="end" class="sm bd" style="fill:var(--lv0)">慣性支配 |Ri| &lt; 0.1</text>`;
+  // ticks
+  const sup = (e) => `10<tspan dy="-5" font-size="10">${String(e).replace("-", "\u2212")}</tspan>`;
+  for (let e = x0; e <= x1; e++) s += `<text x="${X(10 ** e)}" y="${T + ph + 20}" text-anchor="middle" class="sm mut">${sup(e)}</text>`;
+  for (let e = y0; e <= y1; e++) s += `<text x="${L - 8}" y="${Y(10 ** e) + 4}" text-anchor="end" class="sm mut">${sup(e)}</text>`;
+  s += `<text x="${L + pw / 2}" y="${T + ph + 42}" text-anchor="middle" class="bd">Re</text>`;
+  s += `<text x="20" y="${T + ph / 2}" text-anchor="middle" class="bd" transform="rotate(-90 20 ${T + ph / 2})">|Ri|</text>`;
+  s += `<path d="M${L} ${T}V${T + ph}H${L + pw}" class="ln"/>`;
+  // points
+  [["m", "主流", "pm", "hm", "cm"], ["a", "環状流", "pa", "ha", "ca"]].forEach(([p, nm, fillC, ringC, txtC]) => {
+    const o = out[p]; if (!o) return;
+    const re = o.d.Re, ri = o.d.Ri;
+    const px = X(re), py = (Math.abs(ri) > 0) ? Y(Math.abs(ri)) : Y(1e-6);
+    const oob = re < 10 || re > 1e5 || Math.abs(ri) < 1e-6 || Math.abs(ri) > 1e3 || !(Math.abs(ri) > 0);
+    s += ri < 0 ? `<circle cx="${px}" cy="${py}" r="7" class="${ringC}"/>` : `<circle cx="${px}" cy="${py}" r="7" class="${fillC}"/>`;
+    if (isFinite(o.d.RiF) && Math.abs(o.d.RiF) > 0) {
+      const fy = Y(Math.abs(o.d.RiF));
+      s += `<path d="M${px} ${fy - 8}L${px + 8} ${fy}L${px} ${fy + 8}L${px - 8} ${fy}Z" class="${o.d.RiF < 0 ? ringC : fillC}"/>`;
+      s += `<path d="M${px} ${py}V${fy}" class="dash"/>`;
+    }
+    const right = px < L + pw - 220;
+    const tx = right ? px + 14 : px - 14, anc = right ? "start" : "end";
+    s += `<text x="${tx}" y="${py - 8}" text-anchor="${anc}" class="bd ${txtC}">${nm}${oob ? "(範囲外)" : ""}</text>`;
+    s += `<text x="${tx}" y="${py + 8}" text-anchor="${anc}" class="sm">Re ${svgNum(re)}</text>`;
+    s += `<text x="${tx}" y="${py + 23}" text-anchor="${anc}" class="sm">Ri ${svgNum(ri)}${ri < 0 ? "(負、|Ri| で表示)" : ""}</text>`;
+  });
+  // legend
+  const ly = 458;
+  s += `<circle cx="${L + 8}" cy="${ly - 4}" r="6" class="pm"/><text x="${L + 20}" y="${ly}" class="sm">冷流の Ri (正)</text>`;
+  s += `<circle cx="${L + 150}" cy="${ly - 4}" r="6" class="hm"/><text x="${L + 162}" y="${ly}" class="sm">Ri が負 (|Ri| で表示)</text>`;
+  s += `<path d="M${L + 372} ${ly - 12}l7 8l-7 8l-7 -8z" class="pm"/><text x="${L + 386}" y="${ly}" class="sm">火炎温度ありの Ri</text>`;
+  $("map").innerHTML = s;
+}
+
+function renderMath(out, geo, env) {
+  setFig1(geo);
+  renderSubst(out, env);
+  drawMap(out);
+}
+buildStaticMath();
+
+window.__calc = { sciParts, solveStream, deriveRiRe, mixProps, phiTotal, stoichAir, fuelAirStoichMass, SP };
+calc();
+</script>
+</body>
+</html>
